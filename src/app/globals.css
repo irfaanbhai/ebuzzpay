@@ -1,0 +1,138 @@
+@import "tailwindcss";
+
+/* ============================================================
+   EbuzzPay — Dark Fintech / Glassmorphism Design System
+   Palette: black · grey · navy blue · white
+   ============================================================ */
+
+:root {
+  /* base */
+  --background: #05070b;
+  --background-2: #0a0e16;
+  --foreground: #e7ecf5;
+
+  /* surfaces */
+  --surface: rgba(255, 255, 255, 0.045);
+  --surface-strong: rgba(255, 255, 255, 0.07);
+  --border: rgba(255, 255, 255, 0.09);
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  /* navy accent ramp */
+  --navy-50: #e8eefc;
+  --navy-300: #6f93e6;
+  --navy-400: #4f74d8;
+  --navy-500: #335ec9;
+  --navy-600: #2548a8;
+  --navy-700: #1c3680;
+  --navy-900: #0f1e44;
+
+  /* text */
+  --text: #e7ecf5;
+  --text-muted: #8a93a8;
+  --text-dim: #5b6478;
+
+  /* status */
+  --ok: #34d399;
+  --warn: #fbbf24;
+  --bad: #f87171;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  --color-navy-50: var(--navy-50);
+  --color-navy-300: var(--navy-300);
+  --color-navy-400: var(--navy-400);
+  --color-navy-500: var(--navy-500);
+  --color-navy-600: var(--navy-600);
+  --color-navy-700: var(--navy-700);
+  --color-navy-900: var(--navy-900);
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--background);
+  /* ambient navy glow on a near-black canvas */
+  background-image:
+    radial-gradient(900px 500px at 100% -10%, rgba(51, 94, 201, 0.18), transparent 60%),
+    radial-gradient(800px 500px at -10% 8%, rgba(28, 54, 128, 0.16), transparent 55%),
+    radial-gradient(700px 700px at 50% 120%, rgba(37, 72, 168, 0.12), transparent 60%);
+  background-attachment: fixed;
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- reusable glass surfaces ---------- */
+@layer components {
+  .glass {
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+  }
+
+  .glass-strong {
+    background-color: var(--surface-strong);
+    border: 1px solid var(--border-strong);
+    backdrop-filter: blur(22px) saturate(150%);
+    -webkit-backdrop-filter: blur(22px) saturate(150%);
+  }
+
+  /* primary navy action */
+  .btn-navy {
+    background-image: linear-gradient(135deg, var(--navy-500), var(--navy-700));
+    color: #fff;
+    box-shadow: 0 8px 24px -8px rgba(51, 94, 201, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    transition: transform 0.12s ease, filter 0.2s ease, box-shadow 0.2s ease;
+  }
+  .btn-navy:hover { filter: brightness(1.08); box-shadow: 0 10px 30px -8px rgba(51, 94, 201, 0.7); }
+  .btn-navy:active { transform: scale(0.98); }
+  .btn-navy:disabled { opacity: 0.5; filter: grayscale(0.3); box-shadow: none; }
+
+  /* faint navy halo behind hero elements */
+  .glow-navy {
+    box-shadow: 0 0 0 1px var(--border), 0 24px 60px -28px rgba(51, 94, 201, 0.55);
+  }
+}
+
+/* gradient text accent */
+.text-gradient {
+  background: linear-gradient(120deg, #fff 0%, var(--navy-300) 60%, var(--navy-400) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* hide scrollbars (used by horizontal chip rows) */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* dark form controls */
+input, textarea, select {
+  color-scheme: dark;
+}
+input::placeholder, textarea::placeholder { color: var(--text-dim); }
+
+/* ---------- lightweight entrance animations ---------- */
+@keyframes zp-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes zp-pop { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+@keyframes zp-slide-up { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes zp-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes zp-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+
+.anim-fade { animation: zp-fade 0.35s ease both; }
+.anim-pop { animation: zp-pop 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.anim-slide-up { animation: zp-slide-up 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.anim-float { animation: zp-float 4s ease-in-out infinite; }
+
+/* keep older tailwindcss-animate class names from breaking layout (no-op safe) */
+.animate-in { animation: zp-pop 0.28s ease both; }
+
+::selection { background: rgba(51, 94, 201, 0.4); color: #fff; }
