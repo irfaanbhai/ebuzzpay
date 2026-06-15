@@ -3,7 +3,9 @@ import { NextResponse } from 'next/server'
 
 export async function updateSession(request) {
     // Define protected paths
-    const protectedPaths = ['/admin', '/deposit', '/history', '/payment', '/profile', '/teams', '/tool', '/assets']
+    // Note: '/admin' is intentionally excluded — it has its own password gate
+    // and should be reachable without a normal-user Supabase session.
+    const protectedPaths = ['/deposit', '/history', '/payment', '/profile', '/teams', '/tool', '/assets']
     const isProtected = protectedPaths.some(path => request.nextUrl.pathname.startsWith(path))
 
     // If NOT protected, return immediately without Supabase
