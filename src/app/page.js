@@ -71,7 +71,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen pb-28">
-      <DisclaimerModal />
+      {/* <DisclaimerModal /> */}
 
       {/* 1. Header */}
       <div className="glass sticky top-0 z-10 flex items-center justify-between px-5 py-4">
