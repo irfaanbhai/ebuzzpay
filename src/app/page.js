@@ -13,6 +13,7 @@ export default function Home() {
   const [balance, setBalance] = useState('0.00')
   const [loading, setLoading] = useState(true)
   const [usdtRate, setUsdtRate] = useState(102.0)
+  const [telegramLink, setTelegramLink] = useState('https://t.me/ZPayService')
   const router = useRouter()
   const supabase = createClient()
 
@@ -35,6 +36,12 @@ export default function Home() {
       if (data && !isNaN(parseFloat(data))) setUsdtRate(parseFloat(data))
     }
     fetchRate()
+
+    const fetchTelegramLink = async () => {
+      const { data } = await supabase.rpc('get_admin_setting', { setting_key: 'telegram_link' })
+      if (data) setTelegramLink(data)
+    }
+    fetchTelegramLink()
   }, [router, supabase])
 
   const handleWithdrawClick = () => {
@@ -73,7 +80,9 @@ export default function Home() {
           {/* <span className="text-sm font-semibold tracking-tight text-white/90">EbuzzPay</span> */}
         </div>
         <a
-          href="https://t.me/ZPayService"
+          href={telegramLink}
+          target="_blank"
+          rel="noopener noreferrer"
           className="glass-strong flex h-10 w-10 items-center justify-center rounded-xl text-navy-300 transition-colors hover:text-white"
         >
           <Headset className="h-5 w-5" />

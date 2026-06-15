@@ -1,10 +1,24 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { ArrowLeft, Send, MessageCircle } from 'lucide-react'
+import { createClient } from '@/utils/supabase/client'
+
+const DEFAULT_TELEGRAM_LINK = 'https://t.me/ZPayService'
 
 export default function SupportPage() {
     const router = useRouter()
+    const supabase = createClient()
+    const [telegramLink, setTelegramLink] = useState(DEFAULT_TELEGRAM_LINK)
+
+    useEffect(() => {
+        const fetchTelegramLink = async () => {
+            const { data } = await supabase.rpc('get_admin_setting', { setting_key: 'telegram_link' })
+            if (data) setTelegramLink(data)
+        }
+        fetchTelegramLink()
+    }, [supabase])
 
     return (
         <div className="min-h-screen">
@@ -23,7 +37,7 @@ export default function SupportPage() {
                 </div>
 
                 <a
-                    href="https://t.me/ZPayService"
+                    href={telegramLink}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="glass flex items-center gap-4 rounded-2xl p-5 transition-all hover:bg-white/[0.07]"

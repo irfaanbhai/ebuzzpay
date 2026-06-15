@@ -108,8 +108,8 @@ export default function DepositPage() {
     const [isSubmitting, setIsSubmitting] = useState(false)
 
     // Admin addresses (Placeholders as requested)
-    const TRC20_ADDRESS = "TFTwCdq1Ku2QzMvY36YShAZHaxo4ueoigN"
-    const BEP20_ADDRESS = "0x33538c59ca59d785A54b9B0d93AFAd2376eBa31B"
+    const TRC20_ADDRESS = "TJVPaAuKRnHhMY56QGjPt2bcVySebqDAk1"
+    const BEP20_ADDRESS = "0x54d3627E04997c5a0E32CEc79eeB6CcBD6369e62"
 
     const handleUsdtSubmit = async () => {
         if (!usdtAmount || parseFloat(usdtAmount) <= 0) return alert("Please enter a valid amount")

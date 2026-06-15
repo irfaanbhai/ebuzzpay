@@ -16,6 +16,7 @@ export default function AdminPage() {
     const [stats, setStats] = useState({ total_users: 0, total_balance: 0, pending_deposits: 0, pending_withdrawals: 0 })
     const [adminUpi, setAdminUpi] = useState('')
     const [usdtRate, setUsdtRate] = useState('')
+    const [telegramLink, setTelegramLink] = useState('')
     const [userSearch, setUserSearch] = useState('')
     const [page, setPage] = useState(0)
     const [hasMore, setHasMore] = useState(true)
@@ -172,6 +173,9 @@ export default function AdminPage() {
         const { data: rate } = await supabase.rpc('get_admin_setting', { setting_key: 'usdt_rate' })
         if (rate) setUsdtRate(rate)
 
+        const { data: tg } = await supabase.rpc('get_admin_setting', { setting_key: 'telegram_link' })
+        if (tg) setTelegramLink(tg)
+
         const { data: mm } = await supabase.rpc('get_admin_setting', { setting_key: 'maintenance_mode' })
         if (mm) setMaintenanceMode(mm === 'true')
 
@@ -192,6 +196,18 @@ export default function AdminPage() {
         } catch (error) {
             console.error(error)
             alert('Error updating UPI ID')
+        }
+    }
+
+    const handleUpdateTelegramLink = async (e) => {
+        e.preventDefault()
+        try {
+            const { error } = await supabase.rpc('update_admin_setting', { setting_key: 'telegram_link', new_value: telegramLink })
+            if (error) throw error
+            alert('Telegram Link Updated Successfully')
+        } catch (error) {
+            console.error(error)
+            alert('Error updating Telegram link')
         }
     }
 
@@ -716,6 +732,30 @@ export default function AdminPage() {
                                         className="btn-navy rounded-lg px-6 py-2 text-sm font-bold"
                                     >
                                         Update Rate
+                                    </button>
+                                </form>
+                            </div>
+
+                            <div className="glass rounded-2xl p-6">
+                                <h3 className="mb-4 text-lg font-bold text-white">Telegram Support Link</h3>
+                                <form onSubmit={handleUpdateTelegramLink} className="space-y-4">
+                                    <div>
+                                        <label className="mb-1 block text-sm font-medium text-[var(--text-muted)]">Telegram URL</label>
+                                        <input
+                                            type="url"
+                                            value={telegramLink}
+                                            onChange={(e) => setTelegramLink(e.target.value)}
+                                            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none focus:border-navy-400 focus:ring-2 focus:ring-navy-500/30"
+                                            placeholder="https://t.me/YourChannel"
+                                            required
+                                        />
+                                        <p className="mt-1 text-xs text-[var(--text-dim)]">This link is used for the support button on the home and support pages.</p>
+                                    </div>
+                                    <button
+                                        type="submit"
+                                        className="btn-navy rounded-lg px-6 py-2 text-sm font-bold"
+                                    >
+                                        Update Telegram Link
                                     </button>
                                 </form>
                             </div>
