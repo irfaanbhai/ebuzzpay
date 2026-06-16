@@ -39,12 +39,18 @@ export default function DepositPage() {
     // INR Logic (Generate Amounts)
     const generateAmounts = () => {
         const count = 9
-        const min = 25000
-        const max = 100000
+        const lowCount = 3 // first few cards: 500 - 2000
         const uniquePrices = new Set()
 
+        // 2-3 low-value cards between 500 and 2000
+        while (uniquePrices.size < lowCount) {
+            const price = Math.floor(Math.random() * (2000 - 500 + 1)) + 500
+            uniquePrices.add(price)
+        }
+
+        // remaining cards up to 100000
         while (uniquePrices.size < count) {
-            const price = Math.floor(Math.random() * (max - min + 1)) + min
+            const price = Math.floor(Math.random() * (100000 - 2001 + 1)) + 2001
             uniquePrices.add(price)
         }
 
@@ -138,14 +144,11 @@ export default function DepositPage() {
 
             const { error } = await supabase.from('transactions').insert({
                 user_id: user.id,
-                amount: parseFloat(usdtAmount),
-                converted_amount: usdtInrEquivalent,
-                currency: 'USDT',
-                chain: selectedChain,
+                amount: parseFloat(usdtInrEquivalent),
                 type: 'deposit',
                 status: 'pending',
                 utr: txHash,
-                payment_method: 'crypto'
+                payment_method: `crypto-${selectedChain}`
             })
 
             if (error) throw error
