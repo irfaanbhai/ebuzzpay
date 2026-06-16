@@ -154,11 +154,15 @@ export default function HistoryPage({ title, type }) {
                                         ₹{txn.amount}
                                     </p>
                                     <span className={`mt-1 inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold uppercase ${txn.type === 'withdrawal'
-                                        ? (new Date() - new Date(txn.created_at) > 5 * 60 * 1000 ? 'bg-red-500/15 text-red-300' : 'bg-amber-500/15 text-amber-300')
+                                        ? (txn.status === 'approved' ? 'bg-emerald-500/15 text-emerald-300'
+                                            : txn.status === 'rejected' ? 'bg-red-500/15 text-red-300'
+                                                : (new Date() - new Date(txn.created_at) > 5 * 60 * 1000 ? 'bg-red-500/15 text-red-300' : 'bg-amber-500/15 text-amber-300'))
                                         : (txn.status === 'approved' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-red-500/15 text-red-300')
                                         }`}>
                                         {txn.type === 'withdrawal'
-                                            ? (new Date() - new Date(txn.created_at) > 5 * 60 * 1000 ? 'Expired' : 'Paying')
+                                            ? (txn.status === 'approved' ? 'Success'
+                                                : txn.status === 'rejected' ? 'Expired'
+                                                    : (new Date() - new Date(txn.created_at) > 5 * 60 * 1000 ? 'Expired' : 'Paying'))
                                             : (txn.status === 'approved' ? 'Success' :
                                                 txn.status === 'rejected' ? 'Expired' : txn.status)}
                                     </span>
