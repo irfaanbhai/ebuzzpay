@@ -117,6 +117,26 @@ export default function LoginPage() {
 
                 <div className="glass-strong rounded-3xl px-6 py-8 shadow-2xl sm:px-8">
                     <form className="space-y-5" onSubmit={handleSubmit}>
+                        {!isLogin && (
+                            <div>
+                                <label htmlFor="phone" className="mb-1.5 block text-sm font-medium text-[var(--text-muted)]">
+                                    Mobile number
+                                </label>
+                                <input
+                                    id="phone"
+                                    name="phone"
+                                    type="tel"
+                                    inputMode="numeric"
+                                    autoComplete="tel"
+                                    pattern="\d{10}"
+                                    maxLength={10}
+                                    placeholder="10-digit mobile number"
+                                    required
+                                    className="block w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-[var(--text-dim)] transition-all focus:border-navy-400 focus:outline-none focus:ring-2 focus:ring-navy-500/30"
+                                />
+                            </div>
+                        )}
+
                         <div>
                             <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-[var(--text-muted)]">
                                 Email address
@@ -139,11 +159,27 @@ export default function LoginPage() {
                                 id="password"
                                 name="password"
                                 type="password"
-                                autoComplete="current-password"
+                                autoComplete={isLogin ? 'current-password' : 'new-password'}
                                 required
                                 className="block w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-[var(--text-dim)] transition-all focus:border-navy-400 focus:outline-none focus:ring-2 focus:ring-navy-500/30"
                             />
                         </div>
+
+                        {!isLogin && (
+                            <div>
+                                <label htmlFor="confirm_password" className="mb-1.5 block text-sm font-medium text-[var(--text-muted)]">
+                                    Confirm password
+                                </label>
+                                <input
+                                    id="confirm_password"
+                                    name="confirm_password"
+                                    type="password"
+                                    autoComplete="new-password"
+                                    required
+                                    className="block w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-[var(--text-dim)] transition-all focus:border-navy-400 focus:outline-none focus:ring-2 focus:ring-navy-500/30"
+                                />
+                            </div>
+                        )}
 
                         {error && (
                             <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-center text-sm text-red-300">{error}</div>

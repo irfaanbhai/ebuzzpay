@@ -29,13 +29,24 @@ export async function signup(formData) {
 
     const email = formData.get('email')
     const password = formData.get('password')
+    const confirmPassword = formData.get('confirm_password')
+    const phone = formData.get('phone')
     const referrer_code = formData.get('referrer_code')
+
+    if (!phone || !/^\d{10}$/.test(phone)) {
+        return { error: 'Please enter a valid 10-digit mobile number' }
+    }
+
+    if (password !== confirmPassword) {
+        return { error: 'Passwords do not match' }
+    }
 
     const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
             data: {
+                phone,
                 referrer_code: referrer_code || null
             }
         }
