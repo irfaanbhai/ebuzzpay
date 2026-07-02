@@ -3,10 +3,32 @@
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { Headset, Megaphone, DollarSign, Wallet, BookOpen } from 'lucide-react' // Icons
+import { Headset, Megaphone, Wallet, BookOpen, Trophy } from 'lucide-react' // Icons
 import Link from 'next/link'
 import Image from 'next/image'
 import DisclaimerModal from '@/components/DisclaimerModal'
+
+// Pool of dummy depositors for the "Recent Deposits" leaderboard
+const DEPOSITOR_NAMES = [
+  'Ravi_92', 'Priya ❤️', 'Amit-2291', 'Win-16849', 'Vikram99', 'Neha Singh',
+  'Rohit-8841', 'Anjali', 'Karan_77', 'Deepak12', 'Rahul Champs', 'Team-16996',
+  'Sneha K', 'Arjun-4521', 'Pooja', 'Manish_88', 'Kavya ❤️', 'Suresh21',
+  'Divya Rao', 'Nikhil-7734', 'Ayesha', 'Gaurav99', 'Meera', 'Sandeep_12',
+  'Isha Patel', 'Aakash-9081', 'Tara', 'Rohan55', 'Simran ❤️', 'Yash-3390',
+  'Ananya', 'Vivek_44', 'Riya Sharma', 'Harsh-6612', 'Nisha', 'Aryan90',
+  'Komal', 'Dev-2280', 'Shreya ❤️', 'Ankit77', 'Pallavi', 'Raj-5519',
+  'Tanvi', 'Mohit_31', 'Bhavna', 'Kunal-8842', 'Aditi', 'Varun99',
+  'Lakshya', 'Preeti Singh', 'Naman-4407', 'Ritika', 'Sahil_63', 'Jyoti',
+  'Team-17435', 'Roni', 'Team-2024032', 'Sameer-9915',
+]
+
+// Build the initial deposit pool with random-ish amounts
+function buildDepositPool() {
+  return DEPOSITOR_NAMES.map((name) => ({
+    name,
+    amount: Math.round((5000 + Math.random() * 40000) / 10) * 10,
+  }))
+}
 
 export default function Home() {
   const [user, setUser] = useState(null)
@@ -14,8 +36,33 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
   const [usdtRate, setUsdtRate] = useState(102.0)
   const [telegramLink, setTelegramLink] = useState('https://t.me/ZPayService')
+  const [deposits, setDeposits] = useState([])
   const router = useRouter()
   const supabase = createClient()
+
+  // Seed the deposit pool on the client (avoids SSR hydration mismatch),
+  // then every 5 minutes bump 1-2 random users so the ranking shifts.
+  useEffect(() => {
+    setDeposits(buildDepositPool())
+
+    const interval = setInterval(() => {
+      setDeposits((prev) => {
+        if (!prev.length) return prev
+        const next = prev.map((d) => ({ ...d }))
+        const changes = 1 + Math.floor(Math.random() * 2) // 1 or 2 users
+        for (let i = 0; i < changes; i++) {
+          const idx = Math.floor(Math.random() * next.length)
+          next[idx].amount += Math.round((500 + Math.random() * 4000) / 10) * 10
+        }
+        return next
+      })
+    }, 5 * 60 * 1000)
+
+    return () => clearInterval(interval)
+  }, [])
+
+  // Top 10 depositors by amount, recomputed whenever the pool updates
+  const topDeposits = [...deposits].sort((a, b) => b.amount - a.amount).slice(0, 10)
 
   useEffect(() => {
     const getUserData = async () => {
@@ -137,6 +184,39 @@ export default function Home() {
               earn and maintain our users&apos; confidence.
             </p>
             <p>Thank you for choosing EBuzz—we&apos;re excited to have you as part of our community.</p>
+          </div>
+        </div>
+
+        {/* Recent Deposits Ranking */}
+        <div className="glass anim-slide-up overflow-hidden rounded-3xl p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <Trophy className="h-5 w-5 text-navy-300" />
+            <h3 className="text-base font-bold text-white">Recent Deposits</h3>
+          </div>
+
+          {/* Column headers */}
+          <div className="mb-2 grid grid-cols-[1.4fr_1fr_0.7fr] px-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">
+            <span>Name</span>
+            <span className="text-right">Amount</span>
+            <span className="text-right">Prize (5%)</span>
+          </div>
+
+          <div className="space-y-1">
+            {topDeposits.map((row, i) => (
+              <div
+                key={row.name}
+                className={`grid grid-cols-[1.4fr_1fr_0.7fr] items-center rounded-xl px-1 py-2.5 text-sm ${i < 3 ? 'bg-white/5' : ''}`}
+              >
+                <span className="truncate font-semibold text-white/90">
+                  {i < 3 && <span className="mr-1 text-navy-300">#{i + 1}</span>}
+                  {row.name}
+                </span>
+                <span className="text-right font-bold text-white">₹{row.amount.toLocaleString('en-IN')}</span>
+                <span className="text-right font-bold text-emerald-400">
+                  ₹{Math.round(row.amount * 0.05).toLocaleString('en-IN')}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
 
