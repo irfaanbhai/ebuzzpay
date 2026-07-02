@@ -3,7 +3,7 @@
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { Headset, Megaphone, DollarSign, Wallet } from 'lucide-react' // Icons
+import { Headset, Megaphone, DollarSign, Wallet, BookOpen } from 'lucide-react' // Icons
 import Link from 'next/link'
 import Image from 'next/image'
 import DisclaimerModal from '@/components/DisclaimerModal'
@@ -118,6 +118,25 @@ export default function Home() {
           </div>
           <div className="anim-float flex h-14 w-14 items-center justify-center rounded-full border border-navy-400/40 bg-gradient-to-br from-navy-400 to-navy-700 text-xl font-black italic text-white shadow-[0_10px_30px_-8px_rgba(51,94,201,0.7)]">
             U
+          </div>
+        </div>
+
+        {/* User Guide Disclaimer */}
+        <div className="glass anim-slide-up relative overflow-hidden rounded-3xl p-5">
+          <div className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full bg-navy-500/20 blur-3xl" />
+          <div className="relative z-10 flex items-center gap-2">
+            <BookOpen className="h-5 w-5 text-navy-300" />
+            <h3 className="text-base font-bold text-white">User Guide</h3>
+          </div>
+          <div className="relative z-10 mt-3 space-y-3 text-sm leading-relaxed text-white/80">
+            <p>We&apos;re delighted to have you with us.</p>
+            <p>
+              At <span className="font-semibold text-white">EBuzz</span>, you&apos;ll earn a{' '}
+              <span className="font-semibold text-navy-300">5% commission</span> on eligible transactions. We are
+              committed to providing a trusted and reliable experience, and we&apos;ve worked hard over the years to
+              earn and maintain our users&apos; confidence.
+            </p>
+            <p>Thank you for choosing EBuzz—we&apos;re excited to have you as part of our community.</p>
           </div>
         </div>
 

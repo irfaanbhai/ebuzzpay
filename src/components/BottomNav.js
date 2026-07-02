@@ -23,7 +23,7 @@ export default function BottomNav() {
     return (
         <div className="fixed bottom-0 left-0 z-50 w-full pointer-events-none">
             <div className="mx-auto max-w-5xl px-4 pb-4 pt-2">
-                <div className="glass-strong pointer-events-auto flex h-16 w-full items-center rounded-2xl px-2 shadow-[0_-8px_40px_-12px_rgba(0,0,0,0.8)]">
+                <div className="glass-strong pointer-events-auto flex h-16 w-full items-center rounded-2xl bg-[#070b12]/95 px-2 shadow-[0_-8px_40px_-12px_rgba(0,0,0,0.8)]">
                     {navItems.map((item) => {
                         const Icon = item.icon
                         const isActive = pathname === item.href

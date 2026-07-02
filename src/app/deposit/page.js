@@ -20,7 +20,7 @@ export default function DepositPage() {
     const [usdtInrEquivalent, setUsdtInrEquivalent] = useState(0)
 
     const [RATE, setRate] = useState(102.0)
-    const BONUS_RATE = 0.10
+    const BONUS_RATE = 0.05
     const ACTIVITY_BONUS = 6.00
 
     // Fetch USDT rate from admin settings
@@ -243,7 +243,7 @@ export default function DepositPage() {
                                                         <span className="text-lg font-bold text-white">{item.price} INR</span>
                                                     </div>
                                                     <div className="mt-1 text-xs text-[var(--text-dim)]">
-                                                        Income: ₹ {item.income} (10.00%) <span className="text-[var(--text-dim)]">+6.00(Activity)</span>
+                                                        Income: ₹ {item.income} (5.00%) <span className="text-[var(--text-dim)]">+6.00(Activity)</span>
                                                     </div>
                                                 </div>
                                             </div>
