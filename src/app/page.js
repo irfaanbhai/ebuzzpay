@@ -123,8 +123,8 @@ export default function Home() {
       {/* 1. Header */}
       <div className="glass sticky top-0 z-10 flex items-center justify-between px-5 py-4">
         <div className="flex items-center gap-2.5">
-          <Image src="/logo2.png" alt="EbuzzPay Logo" width={1117} height={194} priority className="h-8 w-auto object-contain" />
-          {/* <span className="text-sm font-semibold tracking-tight text-white/90">EbuzzPay</span> */}
+          <Image src="/logo-epay.png" alt="E Pay Logo" width={1200} height={387} priority className="h-8 w-auto object-contain" />
+          {/* <span className="text-sm font-semibold tracking-tight text-white/90">E Pay</span> */}
         </div>
         <a
           href={telegramLink}
@@ -178,12 +178,21 @@ export default function Home() {
           <div className="relative z-10 mt-3 space-y-3 text-sm leading-relaxed text-white/80">
             <p>We&apos;re delighted to have you with us.</p>
             <p>
-              At <span className="font-semibold text-white">EBuzz</span>, you&apos;ll earn a{' '}
-              <span className="font-semibold text-navy-300">5% commission</span> on eligible transactions. We are
-              committed to providing a trusted and reliable experience, and we&apos;ve worked hard over the years to
-              earn and maintain our users&apos; confidence.
+              At <span className="font-semibold text-white">E Pay</span>, every slot you buy earns a{' '}
+              <span className="font-semibold text-navy-300">5% commission</span>, credited to your wallet{' '}
+              <span className="font-semibold text-navy-300">24 hours</span> after the slot is approved.
             </p>
-            <p>Thank you for choosing EBuzz—we&apos;re excited to have you as part of our community.</p>
+            <p>
+              Commission and bonus amounts must be put on a slot before they can be withdrawn. Only the amount you have
+              placed on a slot is withdrawable.
+            </p>
+            <p>
+              Invite friends and earn on every slot they buy —{' '}
+              <span className="font-semibold text-navy-300">0.10%</span> for 1-5 referrals,{' '}
+              <span className="font-semibold text-navy-300">0.20%</span> above 5, and{' '}
+              <span className="font-semibold text-navy-300">0.50%</span> at 10. You can refer up to 10 people.
+            </p>
+            <p>Thank you for choosing E Pay—we&apos;re excited to have you as part of our community.</p>
           </div>
         </div>
 

@@ -106,12 +106,12 @@ export default function LoginPage() {
 
             <div className="relative z-10 w-full max-w-md">
                 <div className="mb-8 text-center">
-                    <h1 className="text-3xl font-black tracking-tight text-gradient">EbuzzPay</h1>
+                    <h1 className="text-3xl font-black tracking-tight text-gradient">E Pay</h1>
                     <h2 className="mt-3 text-xl font-bold text-white">
                         {isLogin ? 'Welcome back' : 'Create your account'}
                     </h2>
                     <p className="mt-1 text-sm text-[var(--text-muted)]">
-                        {isLogin ? 'Sign in to continue to your wallet' : 'Join EbuzzPay in a few seconds'}
+                        {isLogin ? 'Sign in to continue to your wallet' : 'Join E Pay in a few seconds'}
                     </p>
                 </div>
 

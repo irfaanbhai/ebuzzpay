@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 28 460 148" width="460" height="148" role="img" aria-label="E Pay">
+  <title>E Pay</title>
+  <defs>
+    <!-- userSpaceOnUse: bounding-box gradients collapse on the flat
+         vertical / horizontal strokes that make up these letters -->
+    <linearGradient id="epayOrange" gradientUnits="userSpaceOnUse" x1="40" y1="44" x2="114" y2="156">
+      <stop offset="0%" stop-color="#FDBA4B"/>
+      <stop offset="45%" stop-color="#F97316"/>
+      <stop offset="100%" stop-color="#DC5A0A"/>
+    </linearGradient>
+    <linearGradient id="epayBlue" gradientUnits="userSpaceOnUse" x1="160" y1="44" x2="442" y2="156">
+      <stop offset="0%" stop-color="#7DD3FC"/>
+      <stop offset="40%" stop-color="#3B82F6"/>
+      <stop offset="100%" stop-color="#1D4ED8"/>
+    </linearGradient>
+    <linearGradient id="epayStreak" gradientUnits="userSpaceOnUse" x1="20" y1="0" x2="450" y2="0">
+      <stop offset="0%" stop-color="#F97316" stop-opacity="0"/>
+      <stop offset="30%" stop-color="#FDBA4B" stop-opacity="0.9"/>
+      <stop offset="72%" stop-color="#3B82F6" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#3B82F6" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <g transform="translate(8,0) skewX(-8)">
+    <!-- speed streak under the wordmark -->
+    <path d="M24 162 L446 162 L442 168 L20 168 Z" fill="url(#epayStreak)"/>
+
+    <g fill="none" stroke-width="21" stroke-linecap="square" stroke-linejoin="round">
+      <!-- E -->
+      <g stroke="url(#epayOrange)">
+        <path d="M52 56 L52 144"/>
+        <path d="M52 56 L100 56"/>
+        <path d="M52 100 L90 100"/>
+        <path d="M52 144 L100 144"/>
+      </g>
+
+      <!-- PAY -->
+      <g stroke="url(#epayBlue)">
+        <path d="M172 144 L172 56"/>
+        <path d="M172 56 L200 56 A22 22 0 0 1 200 100 L172 100"/>
+
+        <path d="M258 144 L294 56 L330 144"/>
+        <path d="M270 114 L318 114"/>
+
+        <path d="M362 56 L396 102"/>
+        <path d="M430 56 L396 102"/>
+        <path d="M396 102 L396 144"/>
+      </g>
+    </g>
+  </g>
+</svg>

@@ -12,7 +12,11 @@ export default function TeamsPage() {
         team_count: 0,
         level_b_count: 0,
         level_c_count: 0,
-        today_new_team: 0
+        today_new_team: 0,
+        referral_earned: 0,
+        referral_rate: 0,
+        referral_limit: 10,
+        referral_slots_left: 10
     })
     const [referralCode, setReferralCode] = useState('')
     const [loading, setLoading] = useState(true)
@@ -97,7 +101,18 @@ export default function TeamsPage() {
             {/* Invitation Link */}
             <div className="relative z-20 -mt-6 px-4">
                 <div className="glass rounded-2xl p-5">
-                    <h3 className="mb-3 text-sm font-semibold text-white/90">Invitation Link</h3>
+                    <div className="mb-3 flex items-center justify-between">
+                        <h3 className="text-sm font-semibold text-white/90">Invitation Link</h3>
+                        <span className="rounded-full bg-navy-500/15 px-3 py-1 text-[10px] font-bold text-navy-300">
+                            {stats.team_count} / {stats.referral_limit} invited
+                        </span>
+                    </div>
+                    {stats.referral_slots_left === 0 && (
+                        <p className="mb-3 rounded-lg border border-amber-400/25 bg-amber-500/10 p-2 text-xs text-amber-200/90">
+                            You have reached the limit of {stats.referral_limit} referrals. New signups on your link will
+                            not be linked to your team.
+                        </p>
+                    )}
                     <div className="flex gap-2">
                         <div className="flex-1 truncate rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-[var(--text-muted)]">
                             {referralCode ? `${typeof window !== 'undefined' ? window.location.origin : ''}/register?ref=${referralCode}` : 'Loading...'}
@@ -133,32 +148,77 @@ export default function TeamsPage() {
                 </div>
             </div>
 
+            {/* Referral Reward Tiers */}
+            <div className="mt-8 px-4">
+                <div className="mb-4 flex items-center justify-between">
+                    <h3 className="flex items-center gap-2 font-bold text-white">
+                        <Users className="h-5 w-5 text-navy-300" /> Referral Rewards
+                    </h3>
+                    <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-bold text-emerald-300">
+                        Your rate: {Number(stats.referral_rate || 0).toFixed(2)}%
+                    </span>
+                </div>
+
+                <div className="glass overflow-hidden rounded-2xl">
+                    <div className="grid grid-cols-3 border-b border-white/10 p-4 text-xs font-semibold text-[var(--text-dim)]">
+                        <div>Referrals</div>
+                        <div className="text-center">Bonus Rate</div>
+                        <div className="text-right">Status</div>
+                    </div>
+                    {[
+                        { label: '1 - 5 users', rate: '0.10%', min: 1, max: 5 },
+                        { label: '6 - 9 users', rate: '0.20%', min: 6, max: 9 },
+                        { label: '10 users (max)', rate: '0.50%', min: 10, max: 10 },
+                    ].map((row) => {
+                        const active = stats.team_count >= row.min && stats.team_count <= row.max
+                        return (
+                            <div
+                                key={row.label}
+                                className={`grid grid-cols-3 items-center p-4 text-sm font-medium transition-colors ${active ? 'bg-navy-500/10' : ''}`}
+                            >
+                                <div className="font-semibold text-white">{row.label}</div>
+                                <div className="rounded bg-navy-500/15 py-1 text-center text-xs font-bold text-navy-300">{row.rate}</div>
+                                <div className="text-right text-xs text-[var(--text-muted)]">
+                                    {active ? <span className="font-bold text-emerald-400">Active</span> : '—'}
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+
+                <div className="glass mt-4 rounded-2xl p-5">
+                    <div className="mb-3 flex items-center justify-between">
+                        <span className="text-sm text-[var(--text-muted)]">Referral bonus earned</span>
+                        <span className="font-bold text-emerald-400">₹ {Number(stats.referral_earned || 0).toFixed(2)}</span>
+                    </div>
+                    <p className="text-xs leading-relaxed text-[var(--text-dim)]">
+                        You earn this rate on every slot your referrals buy, credited when their deposit is approved.
+                        Bonus amounts must be put on a slot before they can be withdrawn. Maximum {stats.referral_limit} referrals per user.
+                    </p>
+                </div>
+            </div>
+
             {/* Team Detail Table */}
             <div className="mt-8 px-4">
                 <div className="mb-4 flex items-center justify-between">
                     <h3 className="flex items-center gap-2 font-bold text-white">
                         <Users className="h-5 w-5 text-navy-300" /> Team Detail
                     </h3>
-                    <span className="text-xs font-medium text-navy-300">View</span>
                 </div>
 
                 <div className="glass overflow-hidden rounded-2xl">
-                    <div className="grid grid-cols-4 border-b border-white/10 p-4 text-xs font-semibold text-[var(--text-dim)]">
-                        <div className="col-span-1">Level</div>
-                        <div className="col-span-1 text-center">Count</div>
-                        <div className="col-span-1 text-center">Rate</div>
-                        <div className="col-span-1 text-right">Amount</div>
+                    <div className="grid grid-cols-2 border-b border-white/10 p-4 text-xs font-semibold text-[var(--text-dim)]">
+                        <div>Level</div>
+                        <div className="text-right">Count</div>
                     </div>
                     {[
-                        { level: 'Level A', count: stats.team_count, rate: '0.6%', amount: '0.00' },
-                        { level: 'Level B', count: stats.level_b_count, rate: '0.3%', amount: '0.00' },
-                        { level: 'Level C', count: stats.level_c_count, rate: '0.1%', amount: '0.00' },
-                    ].map((row, i) => (
-                        <div key={i} className="grid grid-cols-4 items-center p-4 text-sm font-medium transition-colors hover:bg-white/5">
+                        { level: 'Level A (Direct)', count: stats.team_count },
+                        { level: 'Level B', count: stats.level_b_count },
+                        { level: 'Level C', count: stats.level_c_count },
+                    ].map((row) => (
+                        <div key={row.level} className="grid grid-cols-2 items-center p-4 text-sm font-medium transition-colors hover:bg-white/5">
                             <div className="font-semibold text-white">{row.level}</div>
-                            <div className="text-center text-[var(--text-muted)]">{row.count}</div>
-                            <div className="rounded bg-navy-500/15 py-1 text-center text-xs font-bold text-navy-300">{row.rate}</div>
-                            <div className="text-right text-[var(--text-muted)]">{row.amount}</div>
+                            <div className="text-right text-[var(--text-muted)]">{row.count}</div>
                         </div>
                     ))}
                 </div>

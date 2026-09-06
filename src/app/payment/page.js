@@ -4,7 +4,7 @@ import { createClient } from '@/utils/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState, Suspense, useEffect } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import { Copy, ChevronDown, ChevronRight, CheckCircle2 } from 'lucide-react'
+import { Copy, ChevronDown, ChevronRight, CheckCircle2, Lock } from 'lucide-react'
 
 // Wrap logic in a separate component to use useSearchParams
 function PaymentProcess() {
@@ -21,12 +21,31 @@ function PaymentProcess() {
     const [adminUpi, setAdminUpi] = useState('mahawar-akash@ptyes') // Default fallback
     const ADMIN_NAME = "Admin Merchant"
 
+    // Payer UPI: locked to the account after the first deposit
+    const [payerUpi, setPayerUpi] = useState('')
+    const [registeredUpi, setRegisteredUpi] = useState(null)
+
     useEffect(() => {
         const fetchUpi = async () => {
-            const { data, error } = await supabase.rpc('get_admin_setting', { setting_key: 'admin_upi' })
+            const { data } = await supabase.rpc('get_admin_setting', { setting_key: 'admin_upi' })
             if (data) setAdminUpi(data)
         }
         fetchUpi()
+
+        const fetchPayerUpi = async () => {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('payout_upi')
+                .eq('id', user.id)
+                .single()
+            if (profile?.payout_upi) {
+                setRegisteredUpi(profile.payout_upi)
+                setPayerUpi(profile.payout_upi)
+            }
+        }
+        fetchPayerUpi()
     }, [supabase])
 
     const generateDeepLink = (app) => {
@@ -46,6 +65,11 @@ function PaymentProcess() {
             return
         }
 
+        if (!payerUpi.trim()) {
+            alert('Please enter the UPI ID you paid from')
+            return
+        }
+
         setLoading(true)
         try {
             const { data: { user } } = await supabase.auth.getUser()
@@ -56,12 +80,13 @@ function PaymentProcess() {
                 return
             }
 
-            const { error } = await supabase.from('transactions').insert({
-                user_id: user.id,
-                amount: parseFloat(amount),
-                utr: utr,
-                payment_method: openAccordion || 'other',
-                status: 'pending'
+            // Deposits are accepted only from the UPI ID registered on the
+            // account, and withdrawals are paid back to that same ID.
+            const { error } = await supabase.rpc('submit_upi_deposit', {
+                p_amount: parseFloat(amount),
+                p_utr: utr,
+                p_upi_id: payerUpi.trim().toLowerCase(),
+                p_method: openAccordion || 'other'
             })
 
             if (error) throw error
@@ -73,7 +98,7 @@ function PaymentProcess() {
 
         } catch (error) {
             console.error('Error submitting transaction:', error)
-            alert('Error submitting transaction')
+            alert(error.message || 'Error submitting transaction')
         } finally {
             setLoading(false)
         }
@@ -173,8 +198,29 @@ function PaymentProcess() {
                 ))}
             </div>
 
-            {/* UTR Submission */}
+            {/* Payer UPI */}
             <div className="mt-8">
+                <label className="mb-2 ml-1 block text-sm font-bold text-white/90">Your UPI ID (the one you paid from)</label>
+                <div className="glass flex gap-2 rounded-xl p-2">
+                    <input
+                        type="text"
+                        value={payerUpi}
+                        onChange={(e) => setPayerUpi(e.target.value.toLowerCase().trim())}
+                        disabled={!!registeredUpi}
+                        placeholder="e.g. 9876543210@paytm"
+                        className="flex-1 bg-transparent px-4 py-2 font-medium text-white outline-none disabled:text-white/60"
+                    />
+                    {registeredUpi && <Lock className="mr-3 h-4 w-4 shrink-0 self-center text-navy-300" />}
+                </div>
+                <p className="ml-1 mt-2 text-xs text-[var(--text-dim)]">
+                    {registeredUpi
+                        ? 'This UPI ID is locked to your account. Pay from this ID only — withdrawals are credited back to it.'
+                        : 'Deposits are accepted only from this UPI ID and withdrawals are paid back to it. It cannot be changed later.'}
+                </p>
+            </div>
+
+            {/* UTR Submission */}
+            <div className="mt-6">
                 <label className="mb-2 ml-1 block text-sm font-bold text-white/90">Submit Reference No / UTR</label>
                 <div className="glass flex gap-2 rounded-xl p-2">
                     <input

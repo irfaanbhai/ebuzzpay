@@ -17,6 +17,7 @@ export default function AdminPage() {
     const [adminUpi, setAdminUpi] = useState('')
     const [usdtRate, setUsdtRate] = useState('')
     const [telegramLink, setTelegramLink] = useState('')
+    const [whatsappNumber, setWhatsappNumber] = useState('')
     const [userSearch, setUserSearch] = useState('')
     const [page, setPage] = useState(0)
     const [hasMore, setHasMore] = useState(true)
@@ -93,7 +94,7 @@ export default function AdminPage() {
 
     const handleLogin = (e) => {
         e.preventDefault()
-        if (password === 'admin@1212') {
+        if (password === 'himmatebuzz1122') {
             setIsAuthenticated(true)
             localStorage.setItem('adminPassword', password)
         } else {
@@ -176,6 +177,9 @@ export default function AdminPage() {
         const { data: tg } = await supabase.rpc('get_admin_setting', { setting_key: 'telegram_link' })
         if (tg) setTelegramLink(tg)
 
+        const { data: wa } = await supabase.rpc('get_admin_setting', { setting_key: 'whatsapp_number' })
+        if (wa) setWhatsappNumber(wa)
+
         const { data: mm } = await supabase.rpc('get_admin_setting', { setting_key: 'maintenance_mode' })
         if (mm) setMaintenanceMode(mm === 'true')
 
@@ -208,6 +212,35 @@ export default function AdminPage() {
         } catch (error) {
             console.error(error)
             alert('Error updating Telegram link')
+        }
+    }
+
+    const handleUpdateWhatsapp = async (e) => {
+        e.preventDefault()
+        const digits = whatsappNumber.replace(/\D/g, '')
+        if (digits && digits.length < 10) {
+            return alert('Enter the full WhatsApp number with country code, e.g. 919876543210')
+        }
+        try {
+            const { error } = await supabase.rpc('update_admin_setting', { setting_key: 'whatsapp_number', new_value: digits })
+            if (error) throw error
+            setWhatsappNumber(digits)
+            alert(digits ? 'WhatsApp Number Updated Successfully' : 'WhatsApp support hidden')
+        } catch (error) {
+            console.error(error)
+            alert('Error updating WhatsApp number')
+        }
+    }
+
+    const handleReleaseCommissions = async () => {
+        if (!confirm('Credit every slot commission that has passed its 24 hour wait?')) return
+        try {
+            const { data, error } = await supabase.rpc('release_due_slot_commissions')
+            if (error) throw error
+            alert(`Released ₹${Number(data || 0).toFixed(2)} in matured slot commissions`)
+        } catch (error) {
+            console.error(error)
+            alert('Error releasing commissions')
         }
     }
 
@@ -266,7 +299,7 @@ export default function AdminPage() {
     }
 
     const handleEditBalance = async (userId, currentBalance) => {
-        const newBalance = prompt("Enter new balance:", currentBalance)
+        const newBalance = prompt("Enter new balance:\n\nNote: any increase is added to the user's LOCKED balance — they must put it on a slot before they can withdraw it.", currentBalance)
         if (newBalance === null) return
         const balanceNum = parseFloat(newBalance)
         if (isNaN(balanceNum)) { alert("Invalid amount"); return }
@@ -457,6 +490,11 @@ export default function AdminPage() {
                                     <div className="mb-4 rounded-lg border border-white/5 bg-white/5 p-2 text-xs text-[var(--text-muted)]">
                                         <p>User: {txn.email || txn.user_id}</p>
                                         <p>{txn.currency === 'USDT' ? 'Transaction Hash' : 'UTR'}: {txn.utr}</p>
+                                        {txn.upi_id && (
+                                            <p className="mt-1 font-bold text-white/90">
+                                                {txn.type === 'withdrawal' ? 'Pay to UPI' : 'Paid from UPI'}: {txn.upi_id}
+                                            </p>
+                                        )}
                                         {txn.currency === 'USDT' && (
                                             <p className="mt-1 font-bold text-navy-300">Chain: {txn.chain}</p>
                                         )}
@@ -503,10 +541,19 @@ export default function AdminPage() {
                                                     <p className="font-bold text-navy-300">₹ {user.balance}</p>
                                                 </div>
                                                 <div>
+                                                    <p className="text-[10px] font-bold uppercase text-[var(--text-dim)]">Locked</p>
+                                                    <p className="font-bold text-amber-400">₹ {user.locked_balance || 0}</p>
+                                                </div>
+                                                <div>
                                                     <p className="text-[10px] font-bold uppercase text-[var(--text-dim)]">Today&apos;s Earn</p>
                                                     <p className="font-bold text-emerald-400">₹ {user.today_earnings || 0}</p>
                                                 </div>
                                             </div>
+                                            {user.payout_upi && (
+                                                <p className="mt-2 text-[11px] text-[var(--text-muted)]">
+                                                    Payout UPI: <span className="font-bold text-white/90">{user.payout_upi}</span>
+                                                </p>
+                                            )}
                                         </div>
                                         <div className="flex gap-2">
                                             <button onClick={() => handleEditBalance(user.id, user.balance)} className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-bold text-white/80 hover:bg-white/10">Edit</button>
@@ -756,6 +803,46 @@ export default function AdminPage() {
                                         className="btn-navy rounded-lg px-6 py-2 text-sm font-bold"
                                     >
                                         Update Telegram Link
+                                    </button>
+                                </form>
+                            </div>
+
+                            <div className="glass rounded-2xl p-6">
+                                <h3 className="mb-2 text-lg font-bold text-white">Slot Commissions (5%)</h3>
+                                <p className="mb-4 text-xs leading-relaxed text-[var(--text-dim)]">
+                                    Slot commission is credited 24 hours after a deposit is approved. It settles
+                                    automatically when a user opens their Assets page or requests a withdrawal. Use this
+                                    to credit every matured commission right now.
+                                </p>
+                                <button
+                                    onClick={handleReleaseCommissions}
+                                    className="btn-navy rounded-lg px-6 py-2 text-sm font-bold"
+                                >
+                                    Release Due Commissions
+                                </button>
+                            </div>
+
+                            <div className="glass rounded-2xl p-6">
+                                <h3 className="mb-4 text-lg font-bold text-white">WhatsApp Support Number</h3>
+                                <form onSubmit={handleUpdateWhatsapp} className="space-y-4">
+                                    <div>
+                                        <label className="mb-1 block text-sm font-medium text-[var(--text-muted)]">WhatsApp Number (with country code)</label>
+                                        <input
+                                            type="tel"
+                                            value={whatsappNumber}
+                                            onChange={(e) => setWhatsappNumber(e.target.value)}
+                                            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none focus:border-navy-400 focus:ring-2 focus:ring-navy-500/30"
+                                            placeholder="919876543210"
+                                        />
+                                        <p className="mt-1 text-xs text-[var(--text-dim)]">
+                                            Shown as the WhatsApp button on the Support page. Leave empty to hide it.
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="submit"
+                                        className="btn-navy rounded-lg px-6 py-2 text-sm font-bold"
+                                    >
+                                        Update WhatsApp Number
                                     </button>
                                 </form>
                             </div>

@@ -3,12 +3,14 @@
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { LogOut, History, Shield, Lock, RotateCw, ChevronRight, Wallet, ArrowDownCircle, Banknote, X, CheckCircle } from 'lucide-react'
+import { LogOut, History, Shield, Lock, RotateCw, ChevronRight, Wallet, Banknote, X, CheckCircle, FileText } from 'lucide-react'
 
 export default function AssetsPage() {
     const [user, setUser] = useState(null)
-    const [profile, setProfile] = useState({ balance: 0.00 })
+    const [profile, setProfile] = useState({ balance: 0.00, locked_balance: 0.00, payout_upi: null })
     const [todayEarnings, setTodayEarnings] = useState(0.00)
+    const [pendingCommission, setPendingCommission] = useState(0.00)
+    const [nextCommissionAt, setNextCommissionAt] = useState(null)
 
     // Withdrawal State
     const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false)
@@ -33,6 +35,20 @@ export default function AssetsPage() {
 
                 if (profile) setProfile(profile)
 
+                // Settles any slot commission that has passed its 24h wait
+                // and returns the up-to-date wallet figures.
+                const { data: summary } = await supabase.rpc('get_wallet_summary')
+                if (summary) {
+                    setProfile((prev) => ({
+                        ...prev,
+                        balance: Number(summary.balance || 0),
+                        locked_balance: Number(summary.locked_balance || 0),
+                        payout_upi: summary.payout_upi
+                    }))
+                    setPendingCommission(Number(summary.pending_commission || 0))
+                    setNextCommissionAt(summary.next_commission_at)
+                }
+
                 // Fetch Today's Earnings
                 const { data: earnings } = await supabase.rpc('get_today_earnings', { target_user_id: user.id })
                 if (earnings !== null) setTodayEarnings(earnings)
@@ -48,6 +64,9 @@ export default function AssetsPage() {
         router.push('/login')
     }
 
+    const lockedBalance = Number(profile.locked_balance || 0)
+    const withdrawableBalance = Math.max(0, Number(profile.balance || 0) - lockedBalance)
+
     const handleWithdrawal = async (e) => {
         e.preventDefault()
         setError('')
@@ -61,17 +80,15 @@ export default function AssetsPage() {
             if (amount > profile.balance) {
                 throw new Error('Insufficient balance')
             }
+            if (!profile.payout_upi) {
+                throw new Error('Buy a slot first. Withdrawals are paid only to the UPI ID you deposited from.')
+            }
+            if (amount > withdrawableBalance) {
+                throw new Error(`₹${lockedBalance.toFixed(2)} of your balance has not been used on a slot yet. Put it on a slot before withdrawing.`)
+            }
 
-            const { error: txError } = await supabase
-                .from('transactions')
-                .insert({
-                    user_id: user.id,
-                    amount: amount,
-                    type: 'withdrawal',
-                    status: 'pending',
-                    payment_method: 'system',
-                    utr: `WD_${Date.now()}_${Math.floor(Math.random() * 1000)}` // Generate placeholder UTR
-                })
+            // Server re-checks the locked balance and the registered UPI ID
+            const { error: txError } = await supabase.rpc('request_withdrawal', { p_amount: amount })
 
             if (txError) throw txError
 
@@ -104,6 +121,7 @@ export default function AssetsPage() {
         { name: 'Deposit History', icon: RotateCw, color: 'text-emerald-400', action: () => router.push('/history/deposit') },
         { name: 'Withdrawal History', icon: RotateCw, color: 'text-red-400', action: () => router.push('/history/withdrawal') },
         { name: 'Support Center', icon: Shield, color: 'text-amber-400', action: () => router.push('/support') },
+        { name: 'Terms & Conditions', icon: FileText, color: 'text-navy-300', action: () => router.push('/terms') },
         { name: 'Payment Pin', icon: Lock, color: 'text-[var(--text-muted)]', action: () => router.push('/profile/security') },
         { name: 'Change Password', icon: Lock, color: 'text-navy-300', action: () => router.push('/profile/security') },
         { name: 'Version Update', icon: RotateCw, color: 'text-navy-400', action: () => alert('Latest Version: 1.0.2') },
@@ -149,6 +167,26 @@ export default function AssetsPage() {
                         <p className="mt-1 text-xs uppercase tracking-wide text-[var(--text-muted)]">Today&apos;s Earning</p>
                     </div>
                 </div>
+
+                {lockedBalance > 0 && (
+                    <div className="mt-3 flex items-center justify-between rounded-xl border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-xs">
+                        <span className="text-amber-200/90">Locked until put on a slot</span>
+                        <span className="font-bold text-amber-300">₹{lockedBalance.toFixed(2)}</span>
+                    </div>
+                )}
+
+                {pendingCommission > 0 && (
+                    <div className="mt-3 flex items-center justify-between rounded-xl border border-navy-400/30 bg-navy-500/10 px-4 py-3 text-xs">
+                        <div>
+                            <p className="font-medium text-navy-200">Slot commission (5%) on the way</p>
+                            <p className="mt-0.5 text-[10px] text-[var(--text-dim)]">
+                                Credited 24 hours after approval
+                                {nextCommissionAt ? ` · next on ${new Date(nextCommissionAt).toLocaleString()}` : ''}
+                            </p>
+                        </div>
+                        <span className="shrink-0 font-bold text-navy-300">₹{pendingCommission.toFixed(2)}</span>
+                    </div>
+                )}
             </div>
 
             {/* Menu List */}
@@ -218,9 +256,31 @@ export default function AssetsPage() {
                                         required
                                     />
                                 </div>
-                                <div className="mt-2 flex justify-between text-xs text-[var(--text-muted)]">
-                                    <span>Available Balance: ₹{profile.balance.toFixed(2)}</span>
+                                <div className="mt-3 space-y-1.5 rounded-lg border border-white/10 bg-white/5 p-3 text-xs">
+                                    <div className="flex justify-between text-[var(--text-muted)]">
+                                        <span>Wallet Balance</span>
+                                        <span className="font-bold text-white">₹{Number(profile.balance || 0).toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-[var(--text-muted)]">
+                                        <span>Locked (not on a slot yet)</span>
+                                        <span className="font-bold text-amber-400">₹{lockedBalance.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between border-t border-white/10 pt-1.5 text-[var(--text-muted)]">
+                                        <span>Withdrawable</span>
+                                        <span className="font-bold text-emerald-400">₹{withdrawableBalance.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between gap-2 border-t border-white/10 pt-1.5 text-[var(--text-muted)]">
+                                        <span>Payout UPI</span>
+                                        <span className="truncate font-bold text-white">{profile.payout_upi || 'Not set'}</span>
+                                    </div>
                                 </div>
+
+                                {lockedBalance > 0 && (
+                                    <p className="mt-2 text-xs leading-relaxed text-amber-300/90">
+                                        ₹{lockedBalance.toFixed(2)} was credited to you without a slot purchase. Buy a slot of that
+                                        amount to unlock it for withdrawal.
+                                    </p>
+                                )}
                             </div>
 
                             {error && (

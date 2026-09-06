@@ -23,6 +23,11 @@ export default function DepositPage() {
     const BONUS_RATE = 0.05
     const ACTIVITY_BONUS = 6.00
 
+    // Slot limits
+    const MIN_INR = 1000      // INR slots start at ₹1000
+    const MAX_INR = 100000
+    const MIN_USDT = 10       // USDT slots start at $10
+
     // Fetch USDT rate from admin settings
     useEffect(() => {
         const fetchRate = async () => {
@@ -39,18 +44,18 @@ export default function DepositPage() {
     // INR Logic (Generate Amounts)
     const generateAmounts = () => {
         const count = 9
-        const lowCount = 3 // first few cards: 500 - 2000
+        const lowCount = 3 // first few cards: 1000 - 2000
         const uniquePrices = new Set()
 
-        // 2-3 low-value cards between 500 and 2000
+        // 2-3 low-value cards between 1000 and 2000
         while (uniquePrices.size < lowCount) {
-            const price = Math.floor(Math.random() * (2000 - 500 + 1)) + 500
+            const price = Math.floor(Math.random() * (2000 - MIN_INR + 1)) + MIN_INR
             uniquePrices.add(price)
         }
 
         // remaining cards up to 100000
         while (uniquePrices.size < count) {
-            const price = Math.floor(Math.random() * (100000 - 2001 + 1)) + 2001
+            const price = Math.floor(Math.random() * (MAX_INR - 2001 + 1)) + 2001
             uniquePrices.add(price)
         }
 
@@ -76,6 +81,12 @@ export default function DepositPage() {
         const min = parseInt(activeRange.replace('k+', '000'));
         return amounts.filter(item => parseFloat(item.price) >= min);
     }, [amounts, activeRange]);
+
+    // USDT slots: only show amounts worth at least the $10 minimum
+    const usdtAmounts = useMemo(
+        () => filteredAmounts.filter((item) => parseFloat(item.price) / RATE >= MIN_USDT),
+        [filteredAmounts, RATE]
+    );
 
     useEffect(() => {
         setPage(1)
@@ -133,6 +144,7 @@ export default function DepositPage() {
 
     const confirmDeposit = async () => {
         if (!txHash) return alert("Please enter the transaction hash")
+        if (parseFloat(usdtAmount) < MIN_USDT) return alert(`Minimum deposit is ${MIN_USDT} USDT`)
 
         setIsSubmitting(true)
         try {
@@ -243,7 +255,7 @@ export default function DepositPage() {
                                                         <span className="text-lg font-bold text-white">{item.price} INR</span>
                                                     </div>
                                                     <div className="mt-1 text-xs text-[var(--text-dim)]">
-                                                        Income: ₹ {item.income} (5.00%) <span className="text-[var(--text-dim)]">+6.00(Activity)</span>
+                                                        Income: ₹ {item.income} (5.00% after 24h) <span className="text-[var(--text-dim)]">+6.00(Activity)</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -293,15 +305,18 @@ export default function DepositPage() {
                                         ))}
                                     </div>
 
-                                    <div className="mb-4 mt-6 flex gap-4">
+                                    <div className="mb-4 mt-6 flex flex-col gap-2">
                                         <div className="flex flex-1 items-center justify-center rounded-xl border border-navy-400/30 bg-navy-500/10 py-3 text-sm font-bold text-navy-300">
                                             Rate: 1 USDT = {RATE.toFixed(1)} INR
                                         </div>
+                                        <p className="text-center text-xs text-[var(--text-dim)]">
+                                            Minimum deposit: {MIN_USDT} USDT
+                                        </p>
                                     </div>
 
                                     {/* List (Adapted for USDT) */}
                                     <div className="space-y-3 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
-                                        {filteredAmounts.slice(0, page * 20).map((item, index) => {
+                                        {usdtAmounts.slice(0, page * 20).map((item, index) => {
                                             const usdtValue = (parseFloat(item.price) / RATE).toFixed(2)
                                             return (
                                                 <div key={index} className="border-t border-white/5 py-4 first:pt-0">
@@ -312,13 +327,13 @@ export default function DepositPage() {
                                                             </div>
                                                             <div>
                                                                 <div className="flex items-center gap-2">
-                                                                    <span className="text-lg font-bold text-white">{item.price} INR</span>
+                                                                    <span className="text-lg font-bold text-white">{usdtValue} USDT</span>
                                                                 </div>
                                                                 <div className="mt-1 text-xs font-bold text-navy-300">
-                                                                    ≈ {usdtValue} USDT
+                                                                    ≈ {item.price} INR
                                                                 </div>
                                                                 <div className="mt-0.5 text-xs text-[var(--text-dim)]">
-                                                                    Income: ₹ {item.income}
+                                                                    Income: ₹ {item.income} (after 24h)
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -342,14 +357,14 @@ export default function DepositPage() {
                                             )
                                         })}
 
-                                        {filteredAmounts.length === 0 && (
+                                        {usdtAmounts.length === 0 && (
                                             <div className="py-8 text-center text-sm text-[var(--text-muted)]">
-                                                No amounts found in this range.
+                                                No slots of {MIN_USDT} USDT or more in this range.
                                             </div>
                                         )}
 
                                         <div className="flex h-4 w-full items-center justify-center py-4">
-                                            {filteredAmounts.length > page * 20 && <div className="animate-pulse text-xs text-[var(--text-dim)]">Loading more...</div>}
+                                            {usdtAmounts.length > page * 20 && <div className="animate-pulse text-xs text-[var(--text-dim)]">Loading more...</div>}
                                         </div>
                                     </div>
                                 </>

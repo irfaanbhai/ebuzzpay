@@ -17,8 +17,8 @@ const geistMono = Geist_Mono({
 // ... existing font configuration ...
 
 export const metadata = {
-  title: "USDT Deposit App",
-  description: "Secure USDT Deposits and Tracking",
+  title: "E Pay",
+  description: "E Pay - Secure Deposits, Slots and Tracking",
   manifest: "/manifest.json",
 };
 

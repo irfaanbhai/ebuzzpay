@@ -1,7 +1,7 @@
 {
-  "name": "EbuzzPay",
-  "short_name": "EbuzzPay",
-  "description": "EbuzzPay - Digital Payment Platform",
+  "name": "E Pay",
+  "short_name": "E Pay",
+  "description": "E Pay - Digital Payment Platform",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
