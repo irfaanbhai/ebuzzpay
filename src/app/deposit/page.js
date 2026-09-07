@@ -1,125 +1,27 @@
 'use client'
 
-import { Eye } from 'lucide-react'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import { QRCodeCanvas } from 'qrcode.react'
 
+// Minimum deposit, and the default INR bonus paid per 1 USDT.
+// Both the rate and the bonus are overridable from the admin Settings tab.
+const MIN_USDT = 10
+const DEFAULT_RATE = 102.0
+const DEFAULT_BONUS_PER_USDT = 3
+
 export default function DepositPage() {
     const router = useRouter()
-    const [activeTab, setActiveTab] = useState('INR')
 
-    // INR State (List/Filter)
-    const [amounts, setAmounts] = useState([])
-    const [page, setPage] = useState(1)
-    const [activeRange, setActiveRange] = useState('All')
+    const [rate, setRate] = useState(DEFAULT_RATE)
+    const [bonusPerUsdt, setBonusPerUsdt] = useState(DEFAULT_BONUS_PER_USDT)
 
-    // USDT State
     const [usdtAmount, setUsdtAmount] = useState('')
-    const [usdtInrEquivalent, setUsdtInrEquivalent] = useState(0)
+    const [amountError, setAmountError] = useState('')
 
-    const [RATE, setRate] = useState(102.0)
-    const BONUS_RATE = 0.05
-    const ACTIVITY_BONUS = 6.00
-
-    // Slot limits
-    const MIN_INR = 1000      // INR slots start at ₹1000
-    const MAX_INR = 100000
-    const MIN_USDT = 10       // USDT slots start at $10
-
-    // Fetch USDT rate from admin settings
-    useEffect(() => {
-        const fetchRate = async () => {
-            const supabase = createClient()
-            const { data } = await supabase.rpc('get_admin_setting', { setting_key: 'usdt_rate' })
-            if (data && !isNaN(parseFloat(data))) setRate(parseFloat(data))
-        }
-        fetchRate()
-    }, [])
-
-    // USDT Calculations
-    const calculatedInrFromUsdt = usdtAmount ? (parseFloat(usdtAmount) * RATE).toFixed(2) : '0'
-
-    // INR Logic (Generate Amounts)
-    const generateAmounts = () => {
-        const count = 9
-        const lowCount = 3 // first few cards: 1000 - 2000
-        const uniquePrices = new Set()
-
-        // 2-3 low-value cards between 1000 and 2000
-        while (uniquePrices.size < lowCount) {
-            const price = Math.floor(Math.random() * (2000 - MIN_INR + 1)) + MIN_INR
-            uniquePrices.add(price)
-        }
-
-        // remaining cards up to 100000
-        while (uniquePrices.size < count) {
-            const price = Math.floor(Math.random() * (MAX_INR - 2001 + 1)) + 2001
-            uniquePrices.add(price)
-        }
-
-        const sortedPrices = Array.from(uniquePrices).sort((a, b) => a - b)
-
-        return sortedPrices.map(price => {
-            const income = (price * BONUS_RATE).toFixed(2)
-            const quota = (price + parseFloat(income) + ACTIVITY_BONUS).toFixed(2)
-
-            return {
-                price: price.toFixed(2),
-                income: income,
-                activity: ACTIVITY_BONUS.toFixed(2),
-                quota: quota
-            }
-        })
-    }
-
-    const ranges = ['All', '25k+', '30k+', '50k+', '80k+']
-
-    const filteredAmounts = useMemo(() => {
-        if (activeRange === 'All') return amounts;
-        const min = parseInt(activeRange.replace('k+', '000'));
-        return amounts.filter(item => parseFloat(item.price) >= min);
-    }, [amounts, activeRange]);
-
-    // USDT slots: only show amounts worth at least the $10 minimum
-    const usdtAmounts = useMemo(
-        () => filteredAmounts.filter((item) => parseFloat(item.price) / RATE >= MIN_USDT),
-        [filteredAmounts, RATE]
-    );
-
-    useEffect(() => {
-        setPage(1)
-    }, [activeRange])
-
-    useEffect(() => {
-        setAmounts(generateAmounts())
-        const interval = setInterval(() => {
-            setAmounts(generateAmounts())
-        }, 10000)
-        return () => clearInterval(interval)
-    }, [])
-
-    useEffect(() => {
-        const observer = new IntersectionObserver(
-            (entries) => {
-                if (entries[0].isIntersecting) {
-                    setPage((prev) => prev + 1)
-                }
-            },
-            { threshold: 0.1 }
-        )
-        const trigger = document.getElementById('load-more-trigger')
-        if (trigger) {
-            observer.observe(trigger)
-        }
-        return () => {
-            if (trigger) observer.unobserve(trigger)
-        }
-    }, [filteredAmounts])
-
-    // USDT Logic
-    const [usdtStep, setUsdtStep] = useState(1) // 1: Amount, 2: Chain/Address, 3: Hash
+    // 1: enter amount, 2: pick chain / pay / submit hash
+    const [step, setStep] = useState(1)
     const [selectedChain, setSelectedChain] = useState('')
     const [txHash, setTxHash] = useState('')
     const [isSubmitting, setIsSubmitting] = useState(false)
@@ -128,13 +30,36 @@ export default function DepositPage() {
     const TRC20_ADDRESS = "TJVPaAuKRnHhMY56QGjPt2bcVySebqDAk1"
     const BEP20_ADDRESS = "0x54d3627E04997c5a0E32CEc79eeB6CcBD6369e62"
 
-    const handleUsdtSubmit = async () => {
-        if (!usdtAmount || parseFloat(usdtAmount) <= 0) return alert("Please enter a valid amount")
-        setUsdtStep(2)
-    }
+    useEffect(() => {
+        const fetchSettings = async () => {
+            const supabase = createClient()
 
-    const handleChainSelect = (chain) => {
-        setSelectedChain(chain)
+            const { data: rateValue } = await supabase.rpc('get_admin_setting', { setting_key: 'usdt_rate' })
+            if (rateValue && !isNaN(parseFloat(rateValue))) setRate(parseFloat(rateValue))
+
+            const { data: bonusValue } = await supabase.rpc('get_admin_setting', { setting_key: 'usdt_bonus_per_unit' })
+            if (bonusValue && !isNaN(parseFloat(bonusValue))) setBonusPerUsdt(parseFloat(bonusValue))
+        }
+        fetchSettings()
+    }, [])
+
+    // 1 USDT -> `rate` INR, plus a flat `bonusPerUsdt` INR bonus for every USDT
+    const usdtNum = parseFloat(usdtAmount) || 0
+    const inrValue = usdtNum * rate
+    const bonusInr = usdtNum * bonusPerUsdt
+    const totalInr = inrValue + bonusInr
+
+    const handleInvest = () => {
+        if (!usdtAmount || usdtNum <= 0) {
+            setAmountError('Please enter a valid amount')
+            return
+        }
+        if (usdtNum < MIN_USDT) {
+            setAmountError(`Minimum deposit is ${MIN_USDT} USDT`)
+            return
+        }
+        setAmountError('')
+        setStep(2)
     }
 
     const handleCopyAddress = (address) => {
@@ -144,11 +69,10 @@ export default function DepositPage() {
 
     const confirmDeposit = async () => {
         if (!txHash) return alert("Please enter the transaction hash")
-        if (parseFloat(usdtAmount) < MIN_USDT) return alert(`Minimum deposit is ${MIN_USDT} USDT`)
+        if (usdtNum < MIN_USDT) return alert(`Minimum deposit is ${MIN_USDT} USDT`)
 
         setIsSubmitting(true)
         try {
-            // Use Supabase client from top-level import
             const supabase = createClient()
 
             const { data: { user } } = await supabase.auth.getUser()
@@ -156,7 +80,13 @@ export default function DepositPage() {
 
             const { error } = await supabase.from('transactions').insert({
                 user_id: user.id,
-                amount: parseFloat(usdtInrEquivalent),
+                // `amount` is the paid-for INR value; the bonus is tracked
+                // separately so it can be credited as locked money.
+                amount: parseFloat(inrValue.toFixed(2)),
+                bonus_amount: parseFloat(bonusInr.toFixed(2)),
+                usdt_amount: usdtNum,
+                currency: 'USDT',
+                chain: selectedChain,
                 type: 'deposit',
                 status: 'pending',
                 utr: txHash,
@@ -176,278 +106,171 @@ export default function DepositPage() {
         }
     }
 
-
+    const fmt = (n) => n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
     return (
         <div className="min-h-screen pb-28">
             {/* Header */}
             <div className="glass sticky top-0 z-10 px-5 py-4">
-                <div className="mb-4 flex items-center justify-between">
-                    <h1 className="text-xl font-bold text-white">Deposit</h1>
+                <div className="flex items-center justify-between">
+                    <h1 className="text-xl font-bold text-white">USDT Deposit</h1>
                     <div className="flex h-9 w-9 items-center justify-center rounded-full border border-navy-400/30 bg-navy-500/15 font-bold text-navy-300">
                         ?
                     </div>
                 </div>
-
-                {/* Tabs */}
-                <div className="flex gap-2">
-                    <button
-                        onClick={() => setActiveTab('INR')}
-                        className={`flex-1 rounded-xl py-2.5 text-sm font-bold transition-all ${activeTab === 'INR' ? 'btn-navy' : 'border border-white/10 bg-white/5 text-[var(--text-muted)]'}`}
-                    >
-                        INR (disabled)
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('USDT')}
-                        className={`flex-1 rounded-xl py-2.5 text-sm font-bold transition-all ${activeTab === 'USDT' ? 'btn-navy' : 'border border-white/10 bg-white/5 text-[var(--text-muted)]'}`}
-                    >
-                        USDT
-                    </button>
-                </div>
             </div>
 
-            {/* Content Container */}
             <div className="p-4">
-                <div className="glass rounded-3xl p-6">
-                    <div className="mb-6 flex items-center justify-between">
-                        <div className="flex items-center gap-2 font-medium text-[var(--text-muted)]">
-                            <span>Quota</span>
-                            <Eye className="h-4 w-4" />
+                {step === 1 && (
+                    <div className="anim-slide-up space-y-4">
+                        {/* Amount + live rate */}
+                        <div className="flex gap-3">
+                            <div className="glass flex flex-1 items-center rounded-2xl px-4 py-3">
+                                <input
+                                    type="number"
+                                    inputMode="decimal"
+                                    value={usdtAmount}
+                                    onChange={(e) => {
+                                        setUsdtAmount(e.target.value)
+                                        if (amountError) setAmountError('')
+                                    }}
+                                    min={MIN_USDT}
+                                    step="0.01"
+                                    placeholder="0"
+                                    className="w-full min-w-0 flex-1 bg-transparent text-lg font-bold text-white outline-none"
+                                />
+                                <span className="ml-2 shrink-0 text-sm font-semibold text-[var(--text-muted)]">USDT</span>
+                            </div>
+                            <div className="flex shrink-0 items-center rounded-2xl border border-navy-400/30 bg-navy-500/10 px-4 text-sm font-bold text-amber-400">
+                                1 USDT = {rate.toFixed(1)} INR
+                            </div>
                         </div>
-                        <button className="text-sm font-bold text-navy-300">
-                            How To Buy Quota
+
+                        {amountError && (
+                            <p className="ml-1 text-xs font-medium text-red-400">{amountError}</p>
+                        )}
+
+                        {/* Breakdown */}
+                        <div className="glass space-y-3 rounded-2xl p-5">
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="text-[var(--text-muted)]">Value</span>
+                                <span className="font-semibold text-white">{fmt(inrValue)} INR</span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="text-[var(--text-muted)]">
+                                    Estimated bonus
+                                    <span className="ml-1 text-[10px] text-[var(--text-dim)]">
+                                        (₹{bonusPerUsdt}/USDT)
+                                    </span>
+                                </span>
+                                <span className="font-semibold text-emerald-400">{fmt(bonusInr)} INR</span>
+                            </div>
+                            <div className="flex items-center justify-between border-t border-white/10 pt-3">
+                                <span className="font-bold text-white">You will receive</span>
+                                <span className="text-lg font-bold text-amber-400">{fmt(totalInr)} INR</span>
+                            </div>
+                        </div>
+
+                        {/* Notes */}
+                        <div className="space-y-2 px-1 text-xs leading-relaxed text-red-400/90">
+                            <p>* Minimum deposit is {MIN_USDT} USDT.</p>
+                            <p>* Each address is valid for 30 minutes, please do not save this address</p>
+                            <p>* After the recharge is completed, please wait for 3-5 minutes for the deposit to arrive</p>
+                            <p className="text-[var(--text-dim)]">
+                                * The bonus is credited as locked balance — put it on a slot to make it withdrawable.
+                            </p>
+                        </div>
+
+                        <button
+                            onClick={handleInvest}
+                            className="btn-navy w-full rounded-xl py-3.5 text-lg font-bold"
+                        >
+                            Invest
                         </button>
                     </div>
+                )}
 
-                    <div className="mb-6 text-center">
-                        <h2 className="text-3xl font-black text-gradient">0.00 INR</h2>
-                    </div>
-
-                    {activeTab === 'INR' ? (
-                        <>
-                            {/* Range Selector */}
-                            <div className="no-scrollbar flex gap-2 overflow-x-auto pb-2">
-                                {ranges.map((range) => (
-                                    <button
-                                        key={range}
-                                        onClick={() => setActiveRange(range)}
-                                        className={`whitespace-nowrap rounded-lg px-4 py-1.5 text-xs font-medium transition-colors ${activeRange === range
-                                            ? 'btn-navy'
-                                            : 'border border-white/10 bg-white/5 text-[var(--text-muted)] hover:border-navy-400/40'
-                                            }`}
-                                    >
-                                        {range}
-                                    </button>
-                                ))}
-                            </div>
-
-                            {/* List */}
-                            <div className="mt-6 space-y-3 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
-                                {filteredAmounts.slice(0, page * 20).map((item, index) => (
-                                    <div key={index} className="border-t border-white/5 py-4 first:pt-0">
-                                        <div className="mb-2 flex items-start justify-between">
-                                            <div className="flex items-center gap-3">
-                                                <div className="flex h-10 w-10 items-center justify-center rounded-full border border-navy-400/30 bg-navy-500/15 font-bold text-navy-300">
-                                                    ₹
-                                                </div>
-                                                <div>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-lg font-bold text-white">{item.price} INR</span>
-                                                    </div>
-                                                    <div className="mt-1 text-xs text-[var(--text-dim)]">
-                                                        Income: ₹ {item.income} (5.00% after 24h) <span className="text-[var(--text-dim)]">+6.00(Activity)</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div className="text-right">
-                                                <button
-                                                    onClick={() => router.push(`/payment?amount=${item.price}`)}
-                                                    className="btn-navy rounded-lg px-6 py-1.5 text-xs font-bold"
-                                                >
-                                                    Buy
-                                                </button>
-                                                <div className="mt-1 text-[10px] font-medium text-emerald-400">
-                                                    Quota: + {item.quota}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-
-                                {filteredAmounts.length === 0 && (
-                                    <div className="py-8 text-center text-sm text-[var(--text-muted)]">
-                                        No amounts found in this range.
-                                    </div>
-                                )}
-
-                                <div id="load-more-trigger" className="flex h-4 w-full items-center justify-center py-4">
-                                    {filteredAmounts.length > page * 20 && <div className="animate-pulse text-xs text-[var(--text-dim)]">Loading more...</div>}
-                                </div>
-                            </div>
-                        </>
-                    ) : (
-                        <div className="pt-2">
-                            {usdtStep === 1 && (
-                                <>
-                                    {/* Range Selector (Same as INR) */}
-                                    <div className="no-scrollbar flex gap-2 overflow-x-auto pb-2">
-                                        {ranges.map((range) => (
-                                            <button
-                                                key={range}
-                                                onClick={() => setActiveRange(range)}
-                                                className={`whitespace-nowrap rounded-lg px-4 py-1.5 text-xs font-medium transition-colors ${activeRange === range
-                                                    ? 'btn-navy'
-                                                    : 'border border-white/10 bg-white/5 text-[var(--text-muted)] hover:border-navy-400/40'
-                                                    }`}
-                                            >
-                                                {range}
-                                            </button>
-                                        ))}
-                                    </div>
-
-                                    <div className="mb-4 mt-6 flex flex-col gap-2">
-                                        <div className="flex flex-1 items-center justify-center rounded-xl border border-navy-400/30 bg-navy-500/10 py-3 text-sm font-bold text-navy-300">
-                                            Rate: 1 USDT = {RATE.toFixed(1)} INR
-                                        </div>
-                                        <p className="text-center text-xs text-[var(--text-dim)]">
-                                            Minimum deposit: {MIN_USDT} USDT
-                                        </p>
-                                    </div>
-
-                                    {/* List (Adapted for USDT) */}
-                                    <div className="space-y-3 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
-                                        {usdtAmounts.slice(0, page * 20).map((item, index) => {
-                                            const usdtValue = (parseFloat(item.price) / RATE).toFixed(2)
-                                            return (
-                                                <div key={index} className="border-t border-white/5 py-4 first:pt-0">
-                                                    <div className="mb-2 flex items-start justify-between">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="flex h-10 w-10 items-center justify-center rounded-full border border-navy-400/30 bg-navy-500/15 font-bold text-navy-300">
-                                                                $
-                                                            </div>
-                                                            <div>
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="text-lg font-bold text-white">{usdtValue} USDT</span>
-                                                                </div>
-                                                                <div className="mt-1 text-xs font-bold text-navy-300">
-                                                                    ≈ {item.price} INR
-                                                                </div>
-                                                                <div className="mt-0.5 text-xs text-[var(--text-dim)]">
-                                                                    Income: ₹ {item.income} (after 24h)
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        <div className="text-right">
-                                                            <button
-                                                                onClick={() => {
-                                                                    setUsdtAmount(usdtValue)
-                                                                    setUsdtInrEquivalent(parseFloat(item.price))
-                                                                    setUsdtStep(2)
-                                                                }}
-                                                                className="btn-navy rounded-lg px-6 py-1.5 text-xs font-bold"
-                                                            >
-                                                                Buy
-                                                            </button>
-                                                            <div className="mt-1 text-[10px] font-medium text-emerald-400">
-                                                                Quota: + {item.quota}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )
-                                        })}
-
-                                        {usdtAmounts.length === 0 && (
-                                            <div className="py-8 text-center text-sm text-[var(--text-muted)]">
-                                                No slots of {MIN_USDT} USDT or more in this range.
-                                            </div>
-                                        )}
-
-                                        <div className="flex h-4 w-full items-center justify-center py-4">
-                                            {usdtAmounts.length > page * 20 && <div className="animate-pulse text-xs text-[var(--text-dim)]">Loading more...</div>}
-                                        </div>
-                                    </div>
-                                </>
-                            )}
-
-                            {usdtStep === 2 && (
-                                <div className="anim-slide-up space-y-6">
-                                    <div className="rounded-xl border border-navy-400/30 bg-navy-500/10 p-4 text-center">
-                                        <p className="mb-1 text-lg font-bold text-white">Pay: {usdtAmount} USDT</p>
-                                        <p className="text-sm font-medium text-navy-300">Get: ₹{usdtInrEquivalent}</p>
-                                    </div>
-                                    <h3 className="text-center text-lg font-bold text-white">Select Network</h3>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <button
-                                            onClick={() => handleChainSelect('TRC20')}
-                                            className={`rounded-xl border-2 p-4 transition-all ${selectedChain === 'TRC20' ? 'border-navy-400 bg-navy-500/15 text-white' : 'border-white/10 bg-white/5 text-[var(--text-muted)]'}`}
-                                        >
-                                            <div className="mb-1 text-xl font-bold">TRC20</div>
-                                            <div className="text-xs opacity-75">Tron Network</div>
-                                        </button>
-                                        <button
-                                            onClick={() => handleChainSelect('BEP20')}
-                                            className={`rounded-xl border-2 p-4 transition-all ${selectedChain === 'BEP20' ? 'border-navy-400 bg-navy-500/15 text-white' : 'border-white/10 bg-white/5 text-[var(--text-muted)]'}`}
-                                        >
-                                            <div className="mb-1 text-xl font-bold">BEP20</div>
-                                            <div className="text-xs opacity-75">BSC Network</div>
-                                        </button>
-                                    </div>
-
-                                    {selectedChain && (
-                                        <div className="anim-pop mt-6 space-y-4 text-center">
-                                            <div className="inline-block rounded-xl border border-white/10 bg-white p-4 shadow-inner">
-                                                <QRCodeCanvas
-                                                    value={selectedChain === 'TRC20' ? TRC20_ADDRESS : BEP20_ADDRESS}
-                                                    size={180}
-                                                    level={"H"}
-                                                    includeMargin={true}
-                                                />
-                                            </div>
-
-                                            <div className="space-y-2">
-                                                <p className="text-xs font-semibold uppercase tracking-widest text-[var(--text-muted)]">Deposit Address ({selectedChain})</p>
-                                                <div
-                                                    onClick={() => handleCopyAddress(selectedChain === 'TRC20' ? TRC20_ADDRESS : BEP20_ADDRESS)}
-                                                    className="flex cursor-pointer items-center justify-center gap-2 break-all rounded-lg border border-white/10 bg-white/5 p-3 font-mono text-xs text-white transition-colors hover:bg-white/10"
-                                                >
-                                                    {selectedChain === 'TRC20' ? TRC20_ADDRESS : BEP20_ADDRESS}
-                                                </div>
-                                                <p className="text-[10px] text-navy-300">Tap address to copy</p>
-                                            </div>
-
-                                            <div className="border-t border-white/10 pt-4">
-                                                <label className="mb-2 block text-sm font-medium text-[var(--text-muted)]">Transaction Hash</label>
-                                                <input
-                                                    type="text"
-                                                    value={txHash}
-                                                    onChange={(e) => setTxHash(e.target.value)}
-                                                    placeholder="Enter transaction hash"
-                                                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-navy-400 focus:outline-none focus:ring-2 focus:ring-navy-500/30"
-                                                />
-                                            </div>
-
-                                            <button
-                                                onClick={confirmDeposit}
-                                                disabled={isSubmitting}
-                                                className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-700 py-3.5 text-lg font-bold text-white shadow-[0_10px_30px_-8px_rgba(16,185,129,0.6)] transition-transform active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-                                            >
-                                                {isSubmitting ? 'Verifying...' : 'Submit Deposit'}
-                                            </button>
-
-                                            <button
-                                                onClick={() => setUsdtStep(1)}
-                                                className="mt-4 text-sm text-[var(--text-dim)] hover:text-[var(--text-muted)]"
-                                            >
-                                                Cancel
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
+                {step === 2 && (
+                    <div className="anim-slide-up space-y-6">
+                        <div className="rounded-xl border border-navy-400/30 bg-navy-500/10 p-4 text-center">
+                            <p className="mb-1 text-lg font-bold text-white">Pay: {usdtAmount} USDT</p>
+                            <p className="text-sm font-medium text-navy-300">
+                                Get: ₹{fmt(totalInr)}{' '}
+                                <span className="text-xs text-[var(--text-dim)]">
+                                    (₹{fmt(inrValue)} + ₹{fmt(bonusInr)} bonus)
+                                </span>
+                            </p>
                         </div>
-                    )}
-                </div>
+
+                        <h3 className="text-center text-lg font-bold text-white">Select Network</h3>
+                        <div className="grid grid-cols-2 gap-4">
+                            <button
+                                onClick={() => setSelectedChain('TRC20')}
+                                className={`rounded-xl border-2 p-4 transition-all ${selectedChain === 'TRC20' ? 'border-navy-400 bg-navy-500/15 text-white' : 'border-white/10 bg-white/5 text-[var(--text-muted)]'}`}
+                            >
+                                <div className="mb-1 text-xl font-bold">TRC20</div>
+                                <div className="text-xs opacity-75">Tron Network</div>
+                            </button>
+                            <button
+                                onClick={() => setSelectedChain('BEP20')}
+                                className={`rounded-xl border-2 p-4 transition-all ${selectedChain === 'BEP20' ? 'border-navy-400 bg-navy-500/15 text-white' : 'border-white/10 bg-white/5 text-[var(--text-muted)]'}`}
+                            >
+                                <div className="mb-1 text-xl font-bold">BEP20</div>
+                                <div className="text-xs opacity-75">BSC Network</div>
+                            </button>
+                        </div>
+
+                        {selectedChain && (
+                            <div className="anim-pop mt-6 space-y-4 text-center">
+                                <div className="inline-block rounded-xl border border-white/10 bg-white p-4 shadow-inner">
+                                    <QRCodeCanvas
+                                        value={selectedChain === 'TRC20' ? TRC20_ADDRESS : BEP20_ADDRESS}
+                                        size={180}
+                                        level={"H"}
+                                        includeMargin={true}
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <p className="text-xs font-semibold uppercase tracking-widest text-[var(--text-muted)]">Deposit Address ({selectedChain})</p>
+                                    <div
+                                        onClick={() => handleCopyAddress(selectedChain === 'TRC20' ? TRC20_ADDRESS : BEP20_ADDRESS)}
+                                        className="flex cursor-pointer items-center justify-center gap-2 break-all rounded-lg border border-white/10 bg-white/5 p-3 font-mono text-xs text-white transition-colors hover:bg-white/10"
+                                    >
+                                        {selectedChain === 'TRC20' ? TRC20_ADDRESS : BEP20_ADDRESS}
+                                    </div>
+                                    <p className="text-[10px] text-navy-300">Tap address to copy</p>
+                                </div>
+
+                                <div className="border-t border-white/10 pt-4">
+                                    <label className="mb-2 block text-sm font-medium text-[var(--text-muted)]">Transaction Hash</label>
+                                    <input
+                                        type="text"
+                                        value={txHash}
+                                        onChange={(e) => setTxHash(e.target.value)}
+                                        placeholder="Enter transaction hash"
+                                        className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-navy-400 focus:outline-none focus:ring-2 focus:ring-navy-500/30"
+                                    />
+                                </div>
+
+                                <button
+                                    onClick={confirmDeposit}
+                                    disabled={isSubmitting}
+                                    className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-700 py-3.5 text-lg font-bold text-white shadow-[0_10px_30px_-8px_rgba(16,185,129,0.6)] transition-transform active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    {isSubmitting ? 'Verifying...' : 'Submit Deposit'}
+                                </button>
+                            </div>
+                        )}
+
+                        <button
+                            onClick={() => setStep(1)}
+                            className="mx-auto block text-sm text-[var(--text-dim)] hover:text-[var(--text-muted)]"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     )

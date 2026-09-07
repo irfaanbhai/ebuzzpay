@@ -16,6 +16,7 @@ export default function AdminPage() {
     const [stats, setStats] = useState({ total_users: 0, total_balance: 0, pending_deposits: 0, pending_withdrawals: 0 })
     const [adminUpi, setAdminUpi] = useState('')
     const [usdtRate, setUsdtRate] = useState('')
+    const [usdtBonus, setUsdtBonus] = useState('')
     const [telegramLink, setTelegramLink] = useState('')
     const [whatsappNumber, setWhatsappNumber] = useState('')
     const [userSearch, setUserSearch] = useState('')
@@ -174,6 +175,9 @@ export default function AdminPage() {
         const { data: rate } = await supabase.rpc('get_admin_setting', { setting_key: 'usdt_rate' })
         if (rate) setUsdtRate(rate)
 
+        const { data: bonus } = await supabase.rpc('get_admin_setting', { setting_key: 'usdt_bonus_per_unit' })
+        if (bonus) setUsdtBonus(bonus)
+
         const { data: tg } = await supabase.rpc('get_admin_setting', { setting_key: 'telegram_link' })
         if (tg) setTelegramLink(tg)
 
@@ -256,6 +260,21 @@ export default function AdminPage() {
         } catch (error) {
             console.error(error)
             alert('Error updating USDT rate')
+        }
+    }
+
+    const handleUpdateUsdtBonus = async (e) => {
+        e.preventDefault()
+        if (usdtBonus === '' || isNaN(parseFloat(usdtBonus)) || parseFloat(usdtBonus) < 0) {
+            return alert('Please enter a valid bonus amount')
+        }
+        try {
+            const { error } = await supabase.rpc('update_admin_setting', { setting_key: 'usdt_bonus_per_unit', new_value: usdtBonus.toString() })
+            if (error) throw error
+            alert('USDT Bonus Updated Successfully')
+        } catch (error) {
+            console.error(error)
+            alert('Error updating USDT bonus')
         }
     }
 
@@ -483,7 +502,14 @@ export default function AdminPage() {
                                                     txn.status === 'pending' ? <Clock className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
                                                 {txn.status}
                                             </span>
-                                            <h3 className="mt-1 text-lg font-bold text-white">{txn.type === 'withdrawal' ? '-' : '+'} {txn.currency === 'USDT' ? 'USDT ' : '₹'}{txn.amount}</h3>
+                                            <h3 className="mt-1 text-lg font-bold text-white">
+                                                {txn.type === 'withdrawal' ? '-' : '+'} ₹{txn.amount}
+                                                {Number(txn.bonus_amount) > 0 && (
+                                                    <span className="ml-2 text-sm font-bold text-emerald-400">
+                                                        + ₹{txn.bonus_amount} bonus
+                                                    </span>
+                                                )}
+                                            </h3>
                                         </div>
                                         <span className="text-xs text-[var(--text-dim)]">{new Date(txn.created_at).toLocaleDateString()}</span>
                                     </div>
@@ -496,7 +522,10 @@ export default function AdminPage() {
                                             </p>
                                         )}
                                         {txn.currency === 'USDT' && (
-                                            <p className="mt-1 font-bold text-navy-300">Chain: {txn.chain}</p>
+                                            <p className="mt-1 font-bold text-navy-300">
+                                                {txn.usdt_amount ? `${txn.usdt_amount} USDT` : 'USDT'}
+                                                {txn.chain ? ` · ${txn.chain}` : ''}
+                                            </p>
                                         )}
                                     </div>
                                     {txn.status === 'pending' && (
@@ -779,6 +808,35 @@ export default function AdminPage() {
                                         className="btn-navy rounded-lg px-6 py-2 text-sm font-bold"
                                     >
                                         Update Rate
+                                    </button>
+                                </form>
+                            </div>
+
+                            <div className="glass rounded-2xl p-6">
+                                <h3 className="mb-4 text-lg font-bold text-white">USDT Deposit Bonus</h3>
+                                <form onSubmit={handleUpdateUsdtBonus} className="space-y-4">
+                                    <div>
+                                        <label className="mb-1 block text-sm font-medium text-[var(--text-muted)]">Bonus INR per 1 USDT</label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            value={usdtBonus}
+                                            onChange={(e) => setUsdtBonus(e.target.value)}
+                                            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none focus:border-navy-400 focus:ring-2 focus:ring-navy-500/30"
+                                            placeholder="3"
+                                            required
+                                        />
+                                        <p className="mt-1 text-xs text-[var(--text-dim)]">
+                                            Paid on top of the converted value (e.g. 3 means 100 USDT earns ₹300 bonus).
+                                            The bonus is credited as locked balance.
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="submit"
+                                        className="btn-navy rounded-lg px-6 py-2 text-sm font-bold"
+                                    >
+                                        Update Bonus
                                     </button>
                                 </form>
                             </div>

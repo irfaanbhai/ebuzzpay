@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" role="img" aria-label="Google Pay">
+  <title>Google Pay</title>
+  <rect width="100" height="100" rx="22" fill="#ffffff"/>
+  <rect x="2" y="2" width="96" height="96" rx="20" fill="none" stroke="#E2E8F0" stroke-width="2"/>
+  <!-- four-colour Google ring -->
+  <g fill="none" stroke-width="11">
+    <path d="M50 12 A38 38 0 0 1 88 50" stroke="#EA4335"/>
+    <path d="M88 50 A38 38 0 0 1 50 88" stroke="#FBBC04"/>
+    <path d="M50 88 A38 38 0 0 1 12 50" stroke="#34A853"/>
+    <path d="M12 50 A38 38 0 0 1 50 12" stroke="#4285F4"/>
+  </g>
+  <text x="50" y="52" fill="#5F6368" font-family="'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+        font-size="26" font-weight="700" text-anchor="middle" dominant-baseline="central">Pay</text>
+</svg>

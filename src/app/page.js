@@ -3,66 +3,23 @@
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { Headset, Megaphone, Wallet, BookOpen, Trophy } from 'lucide-react' // Icons
-import Link from 'next/link'
+import { Headset, Megaphone, Wallet } from 'lucide-react' // Icons
 import Image from 'next/image'
-import DisclaimerModal from '@/components/DisclaimerModal'
 
-// Pool of dummy depositors for the "Recent Deposits" leaderboard
-const DEPOSITOR_NAMES = [
-  'Ravi_92', 'Priya ❤️', 'Amit-2291', 'Win-16849', 'Vikram99', 'Neha Singh',
-  'Rohit-8841', 'Anjali', 'Karan_77', 'Deepak12', 'Rahul Champs', 'Team-16996',
-  'Sneha K', 'Arjun-4521', 'Pooja', 'Manish_88', 'Kavya ❤️', 'Suresh21',
-  'Divya Rao', 'Nikhil-7734', 'Ayesha', 'Gaurav99', 'Meera', 'Sandeep_12',
-  'Isha Patel', 'Aakash-9081', 'Tara', 'Rohan55', 'Simran ❤️', 'Yash-3390',
-  'Ananya', 'Vivek_44', 'Riya Sharma', 'Harsh-6612', 'Nisha', 'Aryan90',
-  'Komal', 'Dev-2280', 'Shreya ❤️', 'Ankit77', 'Pallavi', 'Raj-5519',
-  'Tanvi', 'Mohit_31', 'Bhavna', 'Kunal-8842', 'Aditi', 'Varun99',
-  'Lakshya', 'Preeti Singh', 'Naman-4407', 'Ritika', 'Sahil_63', 'Jyoti',
-  'Team-17435', 'Roni', 'Team-2024032', 'Sameer-9915',
-]
-
-// Build the initial deposit pool with random-ish amounts
-function buildDepositPool() {
-  return DEPOSITOR_NAMES.map((name) => ({
-    name,
-    amount: Math.round((5000 + Math.random() * 40000) / 10) * 10,
-  }))
-}
+// Fixed INR slots, plus a custom amount from MIN_INR upwards
+const SLOT_AMOUNTS = [1000, 2000, 5000, 7000, 10000]
+const MIN_INR = 1000
+const BONUS_RATE = 0.05
 
 export default function Home() {
   const [user, setUser] = useState(null)
   const [balance, setBalance] = useState('0.00')
   const [loading, setLoading] = useState(true)
-  const [usdtRate, setUsdtRate] = useState(102.0)
   const [telegramLink, setTelegramLink] = useState('https://t.me/ZPayService')
-  const [deposits, setDeposits] = useState([])
+  const [customAmount, setCustomAmount] = useState('')
+  const [customError, setCustomError] = useState('')
   const router = useRouter()
   const supabase = createClient()
-
-  // Seed the deposit pool on the client (avoids SSR hydration mismatch),
-  // then every 5 minutes bump 1-2 random users so the ranking shifts.
-  useEffect(() => {
-    setDeposits(buildDepositPool())
-
-    const interval = setInterval(() => {
-      setDeposits((prev) => {
-        if (!prev.length) return prev
-        const next = prev.map((d) => ({ ...d }))
-        const changes = 1 + Math.floor(Math.random() * 2) // 1 or 2 users
-        for (let i = 0; i < changes; i++) {
-          const idx = Math.floor(Math.random() * next.length)
-          next[idx].amount += Math.round((500 + Math.random() * 4000) / 10) * 10
-        }
-        return next
-      })
-    }, 5 * 60 * 1000)
-
-    return () => clearInterval(interval)
-  }, [])
-
-  // Top 10 depositors by amount, recomputed whenever the pool updates
-  const topDeposits = [...deposits].sort((a, b) => b.amount - a.amount).slice(0, 10)
 
   useEffect(() => {
     const getUserData = async () => {
@@ -78,18 +35,26 @@ export default function Home() {
     }
     getUserData()
 
-    const fetchRate = async () => {
-      const { data } = await supabase.rpc('get_admin_setting', { setting_key: 'usdt_rate' })
-      if (data && !isNaN(parseFloat(data))) setUsdtRate(parseFloat(data))
-    }
-    fetchRate()
-
     const fetchTelegramLink = async () => {
       const { data } = await supabase.rpc('get_admin_setting', { setting_key: 'telegram_link' })
       if (data) setTelegramLink(data)
     }
     fetchTelegramLink()
   }, [router, supabase])
+
+  const handleInvest = (amount) => {
+    router.push(`/payment?amount=${amount}`)
+  }
+
+  const handleCustomInvest = () => {
+    const amount = parseFloat(customAmount)
+    if (isNaN(amount) || amount < MIN_INR) {
+      setCustomError(`Minimum investment is ₹${MIN_INR.toLocaleString('en-IN')}`)
+      return
+    }
+    setCustomError('')
+    handleInvest(amount)
+  }
 
   const handleWithdrawClick = () => {
     const balanceNum = parseFloat(balance)
@@ -137,95 +102,95 @@ export default function Home() {
       </div>
 
       <div className="space-y-4 p-4">
-        {/* 2. Banner (Recharge Tips) */}
-        <div className="glow-navy anim-slide-up relative min-h-[170px] w-full overflow-hidden rounded-3xl bg-gradient-to-br from-navy-900 via-[#0c1730] to-black p-5">
-          <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-navy-500/20 blur-3xl" />
-          <h2 className="relative z-10 mb-3 text-lg font-bold text-white">Recharge Tips</h2>
-          <div className="relative z-10 space-y-2 text-xs">
-            <div className="flex w-4/5 items-center gap-2 rounded-r-full border border-white/10 bg-white/5 p-2 font-semibold text-white/90 backdrop-blur-sm">
-              <span>🖥️</span> Tools must be ONLINE &amp; ACTIVE
-            </div>
-            <div className="flex w-4/5 items-center gap-2 rounded-r-full border border-white/10 bg-white/5 p-2 font-semibold text-white/90 backdrop-blur-sm">
-              <span>🔗</span> Link Tools with User ID
-            </div>
-            <div className="flex w-4/5 items-center gap-2 rounded-r-full border border-white/10 bg-white/5 p-2 font-semibold text-white/90 backdrop-blur-sm">
-              <span>☁️</span> Submit UTR within 30mins
-            </div>
-          </div>
+        {/* 2. Brand Banner */}
+        <div className="glow-navy anim-slide-up relative flex w-full items-center justify-center overflow-hidden rounded-3xl bg-gradient-to-br from-navy-900 via-[#0c1730] to-black px-6 py-9">
+          <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-navy-500/20 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-12 -left-10 h-40 w-40 rounded-full bg-orange-500/10 blur-3xl" />
+          <Image
+            src="/logo-epay.png"
+            alt="E Pay"
+            width={1200}
+            height={387}
+            priority
+            className="relative z-10 h-14 w-auto object-contain"
+          />
         </div>
 
-        {/* 3. USDT Rate Card */}
-        <div className="glass relative flex items-center justify-between overflow-hidden rounded-3xl p-5">
-          <div>
-            <p className="mb-1 text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">USDT rate</p>
-            <h3 className="mb-3 text-2xl font-black tracking-tight text-gradient">1 USDT = {usdtRate.toFixed(1)} INR</h3>
-            <Link href="/deposit" className="btn-navy inline-block rounded-full px-7 py-2 text-xs font-bold">
-              TOP UP
-            </Link>
+        {/* 3. INR Slots (Invest) */}
+        <div className="glass anim-slide-up rounded-3xl p-5">
+          <div className="mb-1 flex items-center justify-between">
+            <h3 className="text-base font-bold text-white">Invest in INR</h3>
+            <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-[10px] font-bold text-emerald-300">
+              5% in 24h
+            </span>
           </div>
-          <div className="anim-float flex h-14 w-14 items-center justify-center rounded-full border border-navy-400/40 bg-gradient-to-br from-navy-400 to-navy-700 text-xl font-black italic text-white shadow-[0_10px_30px_-8px_rgba(51,94,201,0.7)]">
-            U
-          </div>
-        </div>
+          <p className="mb-4 text-xs text-[var(--text-dim)]">
+            Pick a slot and pay by UPI. Commission is credited 24 hours after approval.
+          </p>
 
-        {/* User Guide Disclaimer */}
-        <div className="glass anim-slide-up relative overflow-hidden rounded-3xl p-5">
-          <div className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full bg-navy-500/20 blur-3xl" />
-          <div className="relative z-10 flex items-center gap-2">
-            <BookOpen className="h-5 w-5 text-navy-300" />
-            <h3 className="text-base font-bold text-white">User Guide</h3>
-          </div>
-          <div className="relative z-10 mt-3 space-y-3 text-sm leading-relaxed text-white/80">
-            <p>We&apos;re delighted to have you with us.</p>
-            <p>
-              At <span className="font-semibold text-white">E Pay</span>, every slot you buy earns a{' '}
-              <span className="font-semibold text-navy-300">5% commission</span>, credited to your wallet{' '}
-              <span className="font-semibold text-navy-300">24 hours</span> after the slot is approved.
-            </p>
-            <p>
-              Commission and bonus amounts must be put on a slot before they can be withdrawn. Only the amount you have
-              placed on a slot is withdrawable.
-            </p>
-            <p>
-              Invite friends and earn on every slot they buy —{' '}
-              <span className="font-semibold text-navy-300">0.10%</span> for 1-5 referrals,{' '}
-              <span className="font-semibold text-navy-300">0.20%</span> above 5, and{' '}
-              <span className="font-semibold text-navy-300">0.50%</span> at 10. You can refer up to 10 people.
-            </p>
-            <p>Thank you for choosing E Pay—we&apos;re excited to have you as part of our community.</p>
-          </div>
-        </div>
-
-        {/* Recent Deposits Ranking */}
-        <div className="glass anim-slide-up overflow-hidden rounded-3xl p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <Trophy className="h-5 w-5 text-navy-300" />
-            <h3 className="text-base font-bold text-white">Recent Deposits</h3>
-          </div>
-
-          {/* Column headers */}
-          <div className="mb-2 grid grid-cols-[1.4fr_1fr_0.7fr] px-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">
-            <span>Name</span>
-            <span className="text-right">Amount</span>
-            <span className="text-right">Prize (5%)</span>
-          </div>
-
-          <div className="space-y-1">
-            {topDeposits.map((row, i) => (
+          <div className="space-y-3">
+            {SLOT_AMOUNTS.map((amount) => (
               <div
-                key={row.name}
-                className={`grid grid-cols-[1.4fr_1fr_0.7fr] items-center rounded-xl px-1 py-2.5 text-sm ${i < 3 ? 'bg-white/5' : ''}`}
+                key={amount}
+                className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4"
               >
-                <span className="truncate font-semibold text-white/90">
-                  {i < 3 && <span className="mr-1 text-navy-300">#{i + 1}</span>}
-                  {row.name}
-                </span>
-                <span className="text-right font-bold text-white">₹{row.amount.toLocaleString('en-IN')}</span>
-                <span className="text-right font-bold text-emerald-400">
-                  ₹{Math.round(row.amount * 0.05).toLocaleString('en-IN')}
-                </span>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-navy-400/30 bg-navy-500/15 font-bold text-navy-300">
+                    ₹
+                  </div>
+                  <div>
+                    <p className="text-lg font-bold leading-tight text-white">
+                      ₹{amount.toLocaleString('en-IN')}
+                    </p>
+                    <p className="mt-0.5 text-xs text-[var(--text-dim)]">
+                      Income: ₹{(amount * BONUS_RATE).toLocaleString('en-IN')} (5% after 24h)
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleInvest(amount)}
+                  className="btn-navy shrink-0 rounded-xl px-6 py-2 text-xs font-bold"
+                >
+                  Invest
+                </button>
               </div>
             ))}
+          </div>
+
+          {/* Custom amount */}
+          <div className="mt-5 rounded-2xl border border-navy-400/25 bg-navy-500/10 p-4">
+            <label className="mb-2 block text-sm font-bold text-white/90">Custom Amount</label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 font-medium text-[var(--text-muted)]">₹</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={customAmount}
+                  onChange={(e) => {
+                    setCustomAmount(e.target.value)
+                    if (customError) setCustomError('')
+                  }}
+                  min={MIN_INR}
+                  step="1"
+                  placeholder={MIN_INR.toString()}
+                  className="w-full rounded-xl border border-white/10 bg-white/5 py-3 pl-8 pr-4 font-bold text-white outline-none focus:border-navy-400 focus:ring-2 focus:ring-navy-500/30"
+                />
+              </div>
+              <button
+                onClick={handleCustomInvest}
+                className="btn-navy shrink-0 rounded-xl px-6 py-3 text-sm font-bold"
+              >
+                Invest
+              </button>
+            </div>
+            {customError ? (
+              <p className="mt-2 text-xs font-medium text-red-400">{customError}</p>
+            ) : (
+              <p className="mt-2 text-xs text-[var(--text-dim)]">
+                Minimum ₹{MIN_INR.toLocaleString('en-IN')} — no upper limit.
+              </p>
+            )}
           </div>
         </div>
 

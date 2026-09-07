@@ -135,7 +135,7 @@ function PaymentProcess() {
                     >
                         <div className="flex items-center gap-3">
                             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white p-1">
-                                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/UPI-Logo-vector.svg/1200px-UPI-Logo-vector.svg.png" alt="UPI" className="h-full w-full object-contain" />
+                                <img src="/upi/upi.svg" alt="UPI" className="h-full w-full object-contain" />
                             </div>
                             <span className="font-bold text-white">Any UPI App (Scan QR)</span>
                         </div>
@@ -159,26 +159,10 @@ function PaymentProcess() {
 
                 {/* Specific Apps Deep Links */}
                 {[
-                    {
-                        id: 'phonepe',
-                        name: 'PhonePe',
-                        logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/71/PhonePe_Logo.svg/1200px-PhonePe_Logo.svg.png'
-                    },
-                    {
-                        id: 'gpay',
-                        name: 'Google Pay',
-                        logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f2/Google_Pay_Logo.svg/1200px-Google_Pay_Logo.svg.png'
-                    },
-                    {
-                        id: 'paytm',
-                        name: 'Paytm',
-                        logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/24/Paytm_Logo_%28standalone%29.svg/1200px-Paytm_Logo_%28standalone%29.svg.png'
-                    },
-                    {
-                        id: 'bhim',
-                        name: 'BHIM',
-                        logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/65/BHIM_SVG_Logo.svg/960px-BHIM_SVG_Logo.svg.png'
-                    },
+                    { id: 'phonepe', name: 'PhonePe', logo: '/upi/phonepe.svg' },
+                    { id: 'gpay', name: 'Google Pay', logo: '/upi/gpay.svg' },
+                    { id: 'paytm', name: 'Paytm', logo: '/upi/paytm.svg' },
+                    { id: 'bhim', name: 'BHIM', logo: '/upi/bhim.svg' },
                 ].map((app) => (
                     <div key={app.id} className="glass rounded-2xl">
                         <a

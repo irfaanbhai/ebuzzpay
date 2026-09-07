@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" role="img" aria-label="Paytm">
+  <title>Paytm</title>
+  <rect width="100" height="100" rx="22" fill="#ffffff"/>
+  <rect x="2" y="2" width="96" height="96" rx="20" fill="none" stroke="#E2E8F0" stroke-width="2"/>
+  <text x="50" y="44" font-family="'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+        font-size="30" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#002970">Pay</text>
+  <text x="50" y="72" font-family="'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+        font-size="30" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#00BAF2">tm</text>
+</svg>

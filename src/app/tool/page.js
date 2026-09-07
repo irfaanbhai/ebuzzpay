@@ -2,7 +2,7 @@
 
 import { createClient } from '@/utils/supabase/client'
 import { useEffect, useState } from 'react'
-import { Plus, Headset, Info, AlertTriangle } from 'lucide-react'
+import { Plus, Headset, Info, AlertTriangle, BookOpen } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 export default function ToolPage() {
@@ -202,6 +202,36 @@ export default function ToolPage() {
                     {warning}
                 </div>
             )}
+
+            {/* User Guide */}
+            <div className="px-4 pt-4">
+                <div className="glass anim-slide-up relative overflow-hidden rounded-3xl p-5">
+                    <div className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full bg-navy-500/20 blur-3xl" />
+                    <div className="relative z-10 flex items-center gap-2">
+                        <BookOpen className="h-5 w-5 text-navy-300" />
+                        <h3 className="text-base font-bold text-white">User Guide</h3>
+                    </div>
+                    <div className="relative z-10 mt-3 space-y-3 text-sm leading-relaxed text-white/80">
+                        <p>We&apos;re delighted to have you with us.</p>
+                        <p>
+                            At <span className="font-semibold text-white">E Pay</span>, every slot you buy earns a{' '}
+                            <span className="font-semibold text-navy-300">5% commission</span>, credited to your wallet{' '}
+                            <span className="font-semibold text-navy-300">24 hours</span> after the slot is approved.
+                        </p>
+                        <p>
+                            Commission and bonus amounts must be put on a slot before they can be withdrawn. Only the
+                            amount you have placed on a slot is withdrawable.
+                        </p>
+                        <p>
+                            Invite friends and earn on every slot they buy —{' '}
+                            <span className="font-semibold text-navy-300">0.10%</span> for 1-5 referrals,{' '}
+                            <span className="font-semibold text-navy-300">0.20%</span> above 5, and{' '}
+                            <span className="font-semibold text-navy-300">0.50%</span> at 10. You can refer up to 10 people.
+                        </p>
+                        <p>Thank you for choosing E Pay—we&apos;re excited to have you as part of our community.</p>
+                    </div>
+                </div>
+            </div>
 
             <div className="px-4 pt-4">
                 <div className="flex items-start gap-3 rounded-2xl border border-amber-400/25 bg-amber-500/10 p-4">
