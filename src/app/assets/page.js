@@ -4,6 +4,8 @@ import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 import { LogOut, History, Shield, Lock, RotateCw, ChevronRight, Wallet, Banknote, X, CheckCircle, FileText, Clock } from 'lucide-react'
+import { useSlotCycle } from '@/hooks/useSlotCycle'
+import SlotCountdown from '@/components/SlotCountdown'
 
 // Compact enough to stay on one line on a narrow phone
 const formatNextCommission = (value) =>
@@ -14,26 +16,12 @@ const formatNextCommission = (value) =>
         minute: '2-digit',
     })
 
-const pad = (n) => String(n).padStart(2, '0')
-
-const splitDuration = (ms) => {
-    const diff = Math.max(0, ms)
-    return {
-        h: pad(Math.floor(diff / 3600000)),
-        m: pad(Math.floor(diff / 60000) % 60),
-        s: pad(Math.floor(diff / 1000) % 60),
-    }
-}
-
 export default function AssetsPage() {
     const [user, setUser] = useState(null)
     const [profile, setProfile] = useState({ balance: 0.00, locked_balance: 0.00, payout_upi: null })
     const [todayEarnings, setTodayEarnings] = useState(0.00)
     const [pendingCommission, setPendingCommission] = useState(0.00)
     const [nextCommissionAt, setNextCommissionAt] = useState(null)
-    // Maturity of the MOST RECENT slot purchase, so buying again restarts the countdown
-    const [bonusAt, setBonusAt] = useState(null)
-    const [bonusLeft, setBonusLeft] = useState(null)
 
     // Withdrawal State
     const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false)
@@ -59,17 +47,6 @@ export default function AssetsPage() {
             setPendingCommission(Number(summary.pending_commission || 0))
             setNextCommissionAt(summary.next_commission_at)
         }
-
-        // The latest slot still waiting out its 24 hours. Taking the newest
-        // (not the earliest) is what makes a fresh purchase restart the timer.
-        const { data: latestSlot } = await supabase
-            .from('slot_commissions')
-            .select('mature_at')
-            .is('credited_at', null)
-            .order('mature_at', { ascending: false })
-            .limit(1)
-            .maybeSingle()
-        setBonusAt(latestSlot?.mature_at ?? null)
 
         // Fetch Today's Earnings
         const { data: earnings } = await supabase.rpc('get_today_earnings', { target_user_id: userId })
@@ -97,32 +74,13 @@ export default function AssetsPage() {
         getData()
     }, [router, supabase, loadWallet])
 
-    // Live countdown to the bonus. Re-reads the wallet once it hits zero so
+    // Same timer as the Home page. When it hits zero, re-read the wallet so
     // the server credits the matured commission and the figures refresh.
-    useEffect(() => {
-        if (!bonusAt || !user) {
-            setBonusLeft(null)
-            return
-        }
+    const { endsAt: bonusAt, left: bonusLeft } = useSlotCycle(user?.id, () => {
+        if (user) loadWallet(user.id)
+    })
 
-        const target = new Date(bonusAt).getTime()
-        let settled = false
-
-        const tick = () => {
-            const diff = target - Date.now()
-            setBonusLeft(splitDuration(diff))
-            if (diff <= 0 && !settled) {
-                settled = true
-                loadWallet(user.id)
-            }
-        }
-
-        tick()
-        const id = setInterval(tick, 1000)
-        return () => clearInterval(id)
-    }, [bonusAt, user, loadWallet])
-
-    // Coming back to the tab after buying a slot picks up the new timer
+    // Coming back to the tab refreshes the wallet figures too
     useEffect(() => {
         if (!user) return
         const onVisible = () => {
@@ -245,34 +203,28 @@ export default function AssetsPage() {
                     </div>
                 </div>
 
-                {bonusLeft && (
-                    <div className="mt-3 rounded-2xl border border-navy-400/30 bg-navy-500/10 px-3 py-3 sm:px-4">
-                        <div className="flex items-center justify-between gap-2">
-                            <div className="flex min-w-0 items-center gap-2">
-                                <Clock className="h-4 w-4 shrink-0 text-navy-300" />
-                                <p className="truncate text-xs font-medium text-navy-100 sm:text-sm">Slot bonus (5%) in</p>
-                            </div>
-                            <div className="flex shrink-0 items-center gap-1">
-                                <span className="rounded-md bg-navy-500/25 px-1.5 py-0.5 text-xs font-bold tabular-nums text-navy-200">{bonusLeft.h}</span>
-                                <span className="text-xs font-bold text-navy-300">:</span>
-                                <span className="rounded-md bg-navy-500/25 px-1.5 py-0.5 text-xs font-bold tabular-nums text-navy-200">{bonusLeft.m}</span>
-                                <span className="text-xs font-bold text-navy-300">:</span>
-                                <span className="rounded-md bg-navy-500/25 px-1.5 py-0.5 text-xs font-bold tabular-nums text-navy-200">{bonusLeft.s}</span>
-                            </div>
+                <div className="mt-3 rounded-2xl border border-navy-400/30 bg-navy-500/10 px-3 py-3 sm:px-4">
+                    <div className="flex items-center justify-between gap-2">
+                        <div className="flex min-w-0 items-center gap-2">
+                            <Clock className={`h-4 w-4 shrink-0 ${bonusLeft ? 'text-navy-300' : 'text-white/40'}`} />
+                            <p className="truncate text-xs font-medium text-navy-100 sm:text-sm">Slot bonus (5%) in</p>
                         </div>
-                        <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-white/10 pt-2">
-                            <p className="min-w-0 text-[10px] leading-relaxed text-[var(--text-dim)]">
-                                Credited 24 hours after your slot is approved. Buying again restarts the timer.
-                                {nextCommissionAt && nextCommissionAt !== bonusAt
-                                    ? ` Earlier slots land from ${formatNextCommission(nextCommissionAt)}.`
-                                    : ''}
-                            </p>
-                            {pendingCommission > 0 && (
-                                <span className="shrink-0 text-xs font-bold tabular-nums text-navy-300">₹{pendingCommission.toFixed(2)}</span>
-                            )}
-                        </div>
+                        <SlotCountdown left={bonusLeft} />
                     </div>
-                )}
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-white/10 pt-2">
+                        <p className="min-w-0 text-[10px] leading-relaxed text-[var(--text-dim)]">
+                            {bonusLeft
+                                ? 'Credited 24 hours after your slot is approved. Buying again restarts the timer.'
+                                : 'Timer starts when your slot purchase is approved.'}
+                            {bonusAt && nextCommissionAt && new Date(nextCommissionAt).getTime() < bonusAt
+                                ? ` Earlier slots land from ${formatNextCommission(nextCommissionAt)}.`
+                                : ''}
+                        </p>
+                        {pendingCommission > 0 && (
+                            <span className="shrink-0 text-xs font-bold tabular-nums text-navy-300">₹{pendingCommission.toFixed(2)}</span>
+                        )}
+                    </div>
+                </div>
 
                 {lockedBalance > 0 && (
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl border border-amber-400/25 bg-amber-500/10 px-3 py-3 text-xs sm:px-4">

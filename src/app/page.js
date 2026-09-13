@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { Headset, Megaphone, Wallet, Check } from 'lucide-react' // Icons
 import Image from 'next/image'
+import { useSlotCycle } from '@/hooks/useSlotCycle'
+import SlotCountdown from '@/components/SlotCountdown'
 
 // Fixed INR slots, plus a custom amount from MIN_INR upwards
 const SLOT_AMOUNTS = [1000, 2000, 5000, 7000, 10000]
@@ -18,10 +20,13 @@ export default function Home() {
   const [telegramLink, setTelegramLink] = useState('https://t.me/ZPayService')
   const [customAmount, setCustomAmount] = useState('')
   const [customError, setCustomError] = useState('')
-  const [todayRecharge, setTodayRecharge] = useState(0)
-  const [resetIn, setResetIn] = useState({ h: '00', m: '00', s: '00' })
   const router = useRouter()
   const supabase = createClient()
+
+  // Same timer as the Assets page: stopped until a slot purchase, then runs
+  // 24h (a new purchase restarts it). The recharge total follows that cycle
+  // and only counts the paid amount, not any bonus on top.
+  const { left: cycleLeft, total: todayRecharge } = useSlotCycle(user?.id)
 
   useEffect(() => {
     const getUserData = async () => {
@@ -30,23 +35,6 @@ export default function Home() {
         setUser(user)
         const { data } = await supabase.from('profiles').select('balance').eq('id', user.id).single()
         if (data) setBalance(data.balance)
-
-        // Today's recharge = approved deposits made since local midnight.
-        // Only the paid amount counts, not the bonus on top of it.
-        const startOfDay = new Date()
-        startOfDay.setHours(0, 0, 0, 0)
-
-        const { data: deposits } = await supabase
-          .from('transactions')
-          .select('amount')
-          .eq('user_id', user.id)
-          .eq('type', 'deposit')
-          .eq('status', 'approved')
-          .gte('created_at', startOfDay.toISOString())
-
-        if (deposits) {
-          setTodayRecharge(deposits.reduce((sum, d) => sum + Number(d.amount || 0), 0))
-        }
       } else {
         router.push('/login')
       }
@@ -60,28 +48,6 @@ export default function Home() {
     }
     fetchTelegramLink()
   }, [router, supabase])
-
-  // Live countdown to midnight, when the daily recharge total resets
-  useEffect(() => {
-    const pad = (n) => String(n).padStart(2, '0')
-
-    const tick = () => {
-      const now = new Date()
-      const midnight = new Date(now)
-      midnight.setHours(24, 0, 0, 0)
-      const diff = Math.max(0, midnight - now)
-
-      setResetIn({
-        h: pad(Math.floor(diff / 3600000)),
-        m: pad(Math.floor(diff / 60000) % 60),
-        s: pad(Math.floor(diff / 1000) % 60),
-      })
-    }
-
-    tick()
-    const id = setInterval(tick, 1000)
-    return () => clearInterval(id)
-  }, [])
 
   // Milestones are evenly spaced on the bar, so the fill is interpolated
   // between the last reached dot and the next one rather than linearly.
@@ -261,62 +227,63 @@ export default function Home() {
 
         {/* 5. Daily Total Recharge (Progress) */}
         <div className="glass rounded-3xl p-5">
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-white/90">Daily Total Recharge</h3>
-            {/* Resets at midnight */}
-            <div className="flex items-center gap-1">
-              <span className="rounded-md bg-navy-500/20 px-1.5 py-0.5 text-xs font-bold text-navy-300">{resetIn.h}</span>
-              <span className="font-bold text-navy-300">:</span>
-              <span className="rounded-md bg-navy-500/20 px-1.5 py-0.5 text-xs font-bold text-navy-300">{resetIn.m}</span>
-              <span className="font-bold text-navy-300">:</span>
-              <span className="rounded-md bg-navy-500/20 px-1.5 py-0.5 text-xs font-bold text-navy-300">{resetIn.s}</span>
-            </div>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h3 className="min-w-0 truncate text-sm font-semibold text-white/90">Daily Total Recharge</h3>
+            {/* Stopped until a slot purchase, then 24h - same timer as Assets */}
+            <SlotCountdown left={cycleLeft} />
           </div>
 
-          <div className="mb-1 text-2xl font-bold text-white">
+          <div className="mb-1 text-2xl font-bold tabular-nums text-white">
             ₹{todayRecharge.toLocaleString('en-IN')}
           </div>
           <p className="mb-6 text-xs text-[var(--text-dim)]">
-            {nextMilestone
-              ? `₹${(nextMilestone - todayRecharge).toLocaleString('en-IN')} more to reach ₹${nextMilestone.toLocaleString('en-IN')}`
-              : 'All milestones completed today 🎉'}
+            {!cycleLeft
+              ? 'Timer starts when your slot purchase is approved'
+              : nextMilestone
+                ? `₹${(nextMilestone - todayRecharge).toLocaleString('en-IN')} more to reach ₹${nextMilestone.toLocaleString('en-IN')}`
+                : 'All milestones completed 🎉'}
           </p>
 
           {/* Progress Steps */}
-          <div className="relative pb-2 pt-6">
-            {/* Bar */}
-            <div className="absolute left-0 right-0 top-[30px] h-2 rounded-full bg-white/10" />
-            {/* Filled portion */}
-            <div
-              className="absolute left-0 top-[30px] h-2 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-500"
-              style={{ width: `${progressPercent}%` }}
-            />
-
-            {/* Items */}
-            <div className="relative z-10 flex justify-between">
-              {SLOT_AMOUNTS.map((val) => {
-                const reached = todayRecharge >= val
-                return (
-                  <div key={val} className="flex flex-col items-center gap-2">
-                    <div
-                      className={`relative flex h-6 w-6 items-center justify-center rounded-full border-2 border-[#0a0e16] transition-colors ${reached
-                        ? 'bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-[0_4px_12px_-4px_rgba(16,185,129,0.9)]'
-                        : 'bg-white/15'
-                        }`}
-                    >
-                      {reached ? (
-                        <Check className="h-3.5 w-3.5 text-white" strokeWidth={3.5} />
-                      ) : (
-                        <span className="text-[10px] font-bold leading-none text-white/50">+</span>
-                      )}
-                    </div>
-                    <span className={`text-[10px] font-bold ${reached ? 'text-emerald-300' : 'text-white/50'}`}>
-                      {val >= 1000 ? `${val / 1000}k` : val}
-                    </span>
-                  </div>
-                )
-              })}
+          <div className="relative flex items-center justify-between">
+            {/* Track runs exactly from the first dot's centre to the last one's */}
+            <div className="absolute inset-x-3 top-1/2 h-1.5 -translate-y-1/2 overflow-hidden rounded-full bg-white/10">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-[width] duration-500"
+                style={{ width: `${progressPercent}%` }}
+              />
             </div>
+
+            {SLOT_AMOUNTS.map((val) => {
+              const reached = todayRecharge >= val
+              return (
+                <div
+                  key={val}
+                  className={`relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${reached
+                    ? 'border-[var(--background-2)] bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-[0_4px_12px_-4px_rgba(16,185,129,0.9)]'
+                    : 'border-white/15 bg-[var(--background-2)]'
+                    }`}
+                >
+                  {reached ? (
+                    <Check className="h-3.5 w-3.5 text-white" strokeWidth={3.5} />
+                  ) : (
+                    <span className="text-[10px] font-bold leading-none text-white/50">+</span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Labels share the dots' width so each sits centred under its dot */}
+          <div className="mt-2 flex justify-between pb-1">
+            {SLOT_AMOUNTS.map((val) => (
+              <span
+                key={val}
+                className={`w-6 shrink-0 whitespace-nowrap text-center text-[10px] font-bold ${todayRecharge >= val ? 'text-emerald-300' : 'text-white/50'}`}
+              >
+                {val >= 1000 ? `${val / 1000}k` : val}
+              </span>
+            ))}
           </div>
         </div>
 
