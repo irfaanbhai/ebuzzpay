@@ -1,0 +1,124 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 794 1123" width="794" height="1123"
+     role="img" aria-label="E Pay — start your USDT journey"
+     font-family="'Segoe UI', system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif">
+  <title>E Pay — Start your USDT journey (A4 flyer, light)</title>
+
+  <defs>
+    <linearGradient id="plBand" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="794" y2="440">
+      <stop offset="0%" stop-color="#26A17B"/>
+      <stop offset="52%" stop-color="#1E6FA8"/>
+      <stop offset="100%" stop-color="#1C3680"/>
+    </linearGradient>
+
+    <linearGradient id="plCta" gradientUnits="userSpaceOnUse" x1="48" y1="980" x2="746" y2="1048">
+      <stop offset="0%" stop-color="#1C3680"/>
+      <stop offset="100%" stop-color="#17936E"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="794" height="1123" fill="#F4F7FD"/>
+
+  <!-- ===================== hero band ===================== -->
+  <path d="M0 0 H794 V368 C598 428 292 392 0 442 Z" fill="url(#plBand)"/>
+
+  <!-- coin motif -->
+  <g opacity="0.16">
+    <circle cx="644" cy="176" r="104" fill="#FFFFFF"/>
+  </g>
+  <g opacity="0.55">
+    <circle cx="644" cy="176" r="104" fill="none" stroke="#FFFFFF" stroke-width="3"/>
+    <circle cx="644" cy="176" r="84" fill="none" stroke="#FFFFFF" stroke-width="1.5" stroke-dasharray="9 8"/>
+    <g fill="none" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round">
+      <path d="M606 140 H682"/>
+      <path d="M644 140 V220"/>
+      <path d="M620 178 H668"/>
+    </g>
+  </g>
+
+  <!-- header logo, white ink for the band -->
+  <g transform="translate(41,34) scale(0.34)">
+    <path d="M80 30 L139 52 V104 C139 140 112 163 80 173 C48 163 21 140 21 104 V52 Z"
+          fill="#FFFFFF" fill-opacity="0.18" stroke="#FFFFFF" stroke-opacity="0.55" stroke-width="4"/>
+    <g fill="none" stroke="#FFFFFF" stroke-width="13" stroke-linecap="round">
+      <path d="M60 68 V138"/><path d="M60 68 H96"/><path d="M60 103 H86"/><path d="M60 138 H100"/>
+    </g>
+    <g transform="translate(175,100) scale(0.82) translate(-41,-100)"
+       fill="none" stroke="#FFFFFF" stroke-width="21" stroke-linecap="square" stroke-linejoin="round">
+      <path d="M52 56 L52 144"/><path d="M52 56 L100 56"/><path d="M52 100 L90 100"/><path d="M52 144 L100 144"/>
+      <path d="M172 144 L172 56"/><path d="M172 56 L200 56 A22 22 0 0 1 200 100 L172 100"/>
+      <path d="M258 144 L294 56 L330 144"/><path d="M270 114 L318 114"/>
+      <path d="M362 56 L396 102"/><path d="M430 56 L396 102"/><path d="M396 102 L396 144"/>
+    </g>
+  </g>
+
+  <text x="48" y="176" font-size="13.5" font-weight="700" letter-spacing="5" fill="#A7F3D0">A CRYPTO WALLET BUILT FOR INDIA</text>
+
+  <text x="48" y="240" font-size="52" font-weight="300" letter-spacing="1" fill="#DFF7EE">START YOUR</text>
+  <text x="48" y="300" font-size="52" font-weight="800" letter-spacing="-0.5" fill="#FFFFFF">USDT JOURNEY</text>
+  <text x="48" y="348" font-size="30" font-weight="600" fill="#7FEBCF">with as little as 10 USDT</text>
+
+  <!-- ===================== three steps ===================== -->
+  <text x="48" y="490" font-size="13" font-weight="700" letter-spacing="4.6" fill="#17936E">THREE STEPS, START TO FINISH</text>
+
+  <g>
+    <rect x="48"  y="510" width="222" height="158" rx="20" fill="#FFFFFF" stroke="#DEE7F5"/>
+    <text x="72"  y="556" font-size="30" font-weight="800" fill="#C6D5EE">01</text>
+    <text x="72"  y="590" font-size="18" font-weight="700" fill="#0F1E44">Send USDT</text>
+    <text x="72"  y="616" font-size="13.5" fill="#5B6478">On TRC20 or BEP20.</text>
+    <text x="72"  y="636" font-size="13.5" fill="#5B6478">Minimum 10 USDT.</text>
+
+    <rect x="286" y="510" width="222" height="158" rx="20" fill="#FFFFFF" stroke="#DEE7F5"/>
+    <text x="310" y="556" font-size="30" font-weight="800" fill="#C6D5EE">02</text>
+    <text x="310" y="590" font-size="18" font-weight="700" fill="#0F1E44">Wallet credited</text>
+    <text x="310" y="616" font-size="13.5" fill="#5B6478">Converted at the in-app</text>
+    <text x="310" y="636" font-size="13.5" fill="#5B6478">rate, plus ₹3 per USDT.</text>
+
+    <rect x="524" y="510" width="222" height="158" rx="20" fill="#FFFFFF" stroke="#DEE7F5"/>
+    <text x="548" y="556" font-size="30" font-weight="800" fill="#A7E7D2">03</text>
+    <text x="548" y="590" font-size="18" font-weight="700" fill="#0F1E44">Take a slot</text>
+    <text x="548" y="616" font-size="13.5" fill="#5B6478">From ₹1,000. 5% comes</text>
+    <text x="548" y="636" font-size="13.5" fill="#5B6478">back 24 hours later.</text>
+  </g>
+
+  <!-- ===================== team block ===================== -->
+  <rect x="48" y="700" width="698" height="128" rx="20" fill="#E6F6F0" stroke="#BFE7D8"/>
+  <text x="76" y="734" font-size="12.5" font-weight="700" letter-spacing="4.4" fill="#17936E">BRING YOUR TEAM</text>
+  <text x="76" y="772" font-size="26" font-weight="800" fill="#0F1E44">Invite up to 10 people</text>
+  <text x="76" y="800" font-size="14.5" fill="#40607A">Every slot your team takes pays you a commission — counted day by day on the Team page.</text>
+
+  <!-- ===================== slot ladder ===================== -->
+  <text x="48" y="866" font-size="13" font-weight="700" letter-spacing="4.6" fill="#17936E">SLOT LADDER — WHAT LANDS AFTER 24 HOURS</text>
+
+  <g>
+    <rect x="48"  y="882" width="130" height="90" rx="16" fill="#FFFFFF" stroke="#DEE7F5"/>
+    <text x="113" y="918" font-size="18" font-weight="700" fill="#0F1E44" text-anchor="middle">₹1,000</text>
+    <text x="113" y="951" font-size="21" font-weight="800" fill="#17936E" text-anchor="middle">+₹50</text>
+
+    <rect x="190" y="882" width="130" height="90" rx="16" fill="#FFFFFF" stroke="#DEE7F5"/>
+    <text x="255" y="918" font-size="18" font-weight="700" fill="#0F1E44" text-anchor="middle">₹2,000</text>
+    <text x="255" y="951" font-size="21" font-weight="800" fill="#17936E" text-anchor="middle">+₹100</text>
+
+    <rect x="332" y="882" width="130" height="90" rx="16" fill="#FFFFFF" stroke="#DEE7F5"/>
+    <text x="397" y="918" font-size="18" font-weight="700" fill="#0F1E44" text-anchor="middle">₹5,000</text>
+    <text x="397" y="951" font-size="21" font-weight="800" fill="#17936E" text-anchor="middle">+₹250</text>
+
+    <rect x="474" y="882" width="130" height="90" rx="16" fill="#FFFFFF" stroke="#DEE7F5"/>
+    <text x="539" y="918" font-size="18" font-weight="700" fill="#0F1E44" text-anchor="middle">₹7,000</text>
+    <text x="539" y="951" font-size="21" font-weight="800" fill="#17936E" text-anchor="middle">+₹350</text>
+
+    <rect x="616" y="882" width="130" height="90" rx="16" fill="#0F1E44"/>
+    <text x="681" y="918" font-size="18" font-weight="700" fill="#FFFFFF" text-anchor="middle">₹10,000</text>
+    <text x="681" y="951" font-size="21" font-weight="800" fill="#5EEAD4" text-anchor="middle">+₹500</text>
+  </g>
+
+  <!-- ===================== call to action ===================== -->
+  <rect x="48" y="1000" width="698" height="66" rx="20" fill="url(#plCta)"/>
+  <text x="76" y="1029" font-size="19" font-weight="700" fill="#FFFFFF">Ask your inviter for the E Pay link</text>
+  <text x="76" y="1051" font-size="13.5" fill="#BFE7D8">Questions? Telegram — t.me/ZPayService</text>
+  <circle cx="702" cy="1033" r="21" fill="#FFFFFF" fill-opacity="0.16"/>
+  <path d="M694 1033 H710 M704 1027 L710 1033 L704 1039" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- ===================== disclosure ===================== -->
+  <text x="48" y="1092" font-size="11" fill="#7A879C">The 5% is credited 24 hours after a slot purchase is approved, as locked balance — it must be placed on a slot before it can be withdrawn.</text>
+  <text x="48" y="1107" font-size="11" fill="#7A879C">Deposit rate, bonus and referral limits are set in-app and can change. Crypto prices move: commit only what you can set aside.</text>
+</svg>

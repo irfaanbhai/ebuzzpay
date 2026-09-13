@@ -2,8 +2,28 @@
 
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
-import { LogOut, History, Shield, Lock, RotateCw, ChevronRight, Wallet, Banknote, X, CheckCircle, FileText } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { LogOut, History, Shield, Lock, RotateCw, ChevronRight, Wallet, Banknote, X, CheckCircle, FileText, Clock } from 'lucide-react'
+
+// Compact enough to stay on one line on a narrow phone
+const formatNextCommission = (value) =>
+    new Date(value).toLocaleString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+    })
+
+const pad = (n) => String(n).padStart(2, '0')
+
+const splitDuration = (ms) => {
+    const diff = Math.max(0, ms)
+    return {
+        h: pad(Math.floor(diff / 3600000)),
+        m: pad(Math.floor(diff / 60000) % 60),
+        s: pad(Math.floor(diff / 1000) % 60),
+    }
+}
 
 export default function AssetsPage() {
     const [user, setUser] = useState(null)
@@ -11,6 +31,9 @@ export default function AssetsPage() {
     const [todayEarnings, setTodayEarnings] = useState(0.00)
     const [pendingCommission, setPendingCommission] = useState(0.00)
     const [nextCommissionAt, setNextCommissionAt] = useState(null)
+    // Maturity of the MOST RECENT slot purchase, so buying again restarts the countdown
+    const [bonusAt, setBonusAt] = useState(null)
+    const [bonusLeft, setBonusLeft] = useState(null)
 
     // Withdrawal State
     const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false)
@@ -21,6 +44,37 @@ export default function AssetsPage() {
 
     const router = useRouter()
     const supabase = createClient()
+
+    const loadWallet = useCallback(async (userId) => {
+        // Settles any slot commission that has passed its 24h wait
+        // and returns the up-to-date wallet figures.
+        const { data: summary } = await supabase.rpc('get_wallet_summary')
+        if (summary) {
+            setProfile((prev) => ({
+                ...prev,
+                balance: Number(summary.balance || 0),
+                locked_balance: Number(summary.locked_balance || 0),
+                payout_upi: summary.payout_upi
+            }))
+            setPendingCommission(Number(summary.pending_commission || 0))
+            setNextCommissionAt(summary.next_commission_at)
+        }
+
+        // The latest slot still waiting out its 24 hours. Taking the newest
+        // (not the earliest) is what makes a fresh purchase restart the timer.
+        const { data: latestSlot } = await supabase
+            .from('slot_commissions')
+            .select('mature_at')
+            .is('credited_at', null)
+            .order('mature_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        setBonusAt(latestSlot?.mature_at ?? null)
+
+        // Fetch Today's Earnings
+        const { data: earnings } = await supabase.rpc('get_today_earnings', { target_user_id: userId })
+        if (earnings !== null) setTodayEarnings(earnings)
+    }, [supabase])
 
     useEffect(() => {
         const getData = async () => {
@@ -35,29 +89,48 @@ export default function AssetsPage() {
 
                 if (profile) setProfile(profile)
 
-                // Settles any slot commission that has passed its 24h wait
-                // and returns the up-to-date wallet figures.
-                const { data: summary } = await supabase.rpc('get_wallet_summary')
-                if (summary) {
-                    setProfile((prev) => ({
-                        ...prev,
-                        balance: Number(summary.balance || 0),
-                        locked_balance: Number(summary.locked_balance || 0),
-                        payout_upi: summary.payout_upi
-                    }))
-                    setPendingCommission(Number(summary.pending_commission || 0))
-                    setNextCommissionAt(summary.next_commission_at)
-                }
-
-                // Fetch Today's Earnings
-                const { data: earnings } = await supabase.rpc('get_today_earnings', { target_user_id: user.id })
-                if (earnings !== null) setTodayEarnings(earnings)
+                await loadWallet(user.id)
             } else {
                 router.push('/login')
             }
         }
         getData()
-    }, [router, supabase])
+    }, [router, supabase, loadWallet])
+
+    // Live countdown to the bonus. Re-reads the wallet once it hits zero so
+    // the server credits the matured commission and the figures refresh.
+    useEffect(() => {
+        if (!bonusAt || !user) {
+            setBonusLeft(null)
+            return
+        }
+
+        const target = new Date(bonusAt).getTime()
+        let settled = false
+
+        const tick = () => {
+            const diff = target - Date.now()
+            setBonusLeft(splitDuration(diff))
+            if (diff <= 0 && !settled) {
+                settled = true
+                loadWallet(user.id)
+            }
+        }
+
+        tick()
+        const id = setInterval(tick, 1000)
+        return () => clearInterval(id)
+    }, [bonusAt, user, loadWallet])
+
+    // Coming back to the tab after buying a slot picks up the new timer
+    useEffect(() => {
+        if (!user) return
+        const onVisible = () => {
+            if (document.visibilityState === 'visible') loadWallet(user.id)
+        }
+        document.addEventListener('visibilitychange', onVisible)
+        return () => document.removeEventListener('visibilitychange', onVisible)
+    }, [user, loadWallet])
 
     const handleSignOut = async () => {
         await supabase.auth.signOut()
@@ -132,99 +205,120 @@ export default function AssetsPage() {
     return (
         <div className="relative min-h-screen pb-28">
             {/* Header */}
-            <div className="glow-navy relative rounded-b-3xl bg-gradient-to-br from-navy-700 via-navy-900 to-black p-6 text-center text-white">
+            <div className="glow-navy relative rounded-b-3xl bg-gradient-to-br from-navy-700 via-navy-900 to-black p-4 text-center text-white sm:p-6">
                 <div className="pointer-events-none absolute -right-6 -top-6 h-32 w-32 rounded-full bg-navy-400/20 blur-3xl" />
-                <h1 className="relative z-10 mb-6 text-xl font-bold">Assets</h1>
+                <h1 className="relative z-10 mb-4 text-lg font-bold sm:mb-6 sm:text-xl">Assets</h1>
 
-                <div className="relative z-10 flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-white/20 bg-gradient-to-br from-navy-300 to-navy-600 text-xl font-bold text-white">
+                <div className="relative z-10 mx-auto flex max-w-2xl items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur-sm sm:gap-4 sm:p-4">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-white/20 bg-gradient-to-br from-navy-300 to-navy-600 text-base font-bold text-white sm:h-12 sm:w-12 sm:text-xl">
                         {user.email ? user.email[0].toUpperCase() : 'U'}
                     </div>
-                    <div className="flex-1 text-left">
-                        <p className="max-w-[150px] truncate font-medium">{user.email}</p>
-                        <p className="text-sm text-navy-50/60">ID: {user.id.slice(0, 8)}</p>
+                    <div className="min-w-0 flex-1 text-left">
+                        <p className="truncate text-sm font-medium sm:text-base">{user.email}</p>
+                        <p className="truncate text-xs text-navy-50/60 sm:text-sm">ID: {user.id.slice(0, 8)}</p>
                     </div>
-                    <div className="rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-navy-700 shadow-sm">
+                    <div className="shrink-0 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-bold leading-tight text-navy-700 shadow-sm sm:px-3 sm:text-xs">
                         Reward Ratio: 3
                     </div>
                 </div>
             </div>
 
             {/* Balance Cards */}
-            <div className="-mt-6 px-4">
-                <div className="glass-strong relative flex items-center justify-between overflow-hidden rounded-2xl p-6 text-white shadow-xl">
+            <div className="-mt-6 px-3 sm:px-4">
+                <div className="glass-strong relative grid grid-cols-2 overflow-hidden rounded-2xl p-4 text-white shadow-xl sm:p-6">
                     {/* Decorative circle */}
                     <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-navy-500/20 blur-2xl" />
 
-                    <div className="relative z-10 w-1/2 border-r border-white/10 pr-4">
-                        <p className="flex items-baseline text-3xl font-bold">
-                            <span className="mr-1 text-lg">₹</span>{profile.balance.toFixed(2)}
+                    <div className="relative z-10 min-w-0 border-r border-white/10 pr-3 sm:pr-6">
+                        <p className="flex items-baseline text-2xl font-bold tabular-nums sm:text-3xl">
+                            <span className="mr-0.5 shrink-0 text-base sm:mr-1 sm:text-lg">₹</span>
+                            <span className="truncate">{profile.balance.toFixed(2)}</span>
                         </p>
-                        <p className="mt-1 text-xs uppercase tracking-wide text-[var(--text-muted)]">Wallet Balance</p>
+                        <p className="mt-1 text-[10px] uppercase leading-tight tracking-wide text-[var(--text-muted)] sm:text-xs">Wallet Balance</p>
                     </div>
-                    <div className="relative z-10 w-1/2 pl-6">
-                        <p className="text-3xl font-bold text-emerald-400">{todayEarnings.toFixed(2)}</p>
-                        <p className="mt-1 text-xs uppercase tracking-wide text-[var(--text-muted)]">Today&apos;s Earning</p>
+                    <div className="relative z-10 min-w-0 pl-3 sm:pl-6">
+                        <p className="flex items-baseline text-2xl font-bold tabular-nums text-emerald-400 sm:text-3xl">
+                            <span className="mr-0.5 shrink-0 text-base sm:mr-1 sm:text-lg">₹</span>
+                            <span className="truncate">{todayEarnings.toFixed(2)}</span>
+                        </p>
+                        <p className="mt-1 text-[10px] uppercase leading-tight tracking-wide text-[var(--text-muted)] sm:text-xs">Today&apos;s Earning</p>
                     </div>
                 </div>
 
-                {lockedBalance > 0 && (
-                    <div className="mt-3 flex items-center justify-between rounded-xl border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-xs">
-                        <span className="text-amber-200/90">Locked until put on a slot</span>
-                        <span className="font-bold text-amber-300">₹{lockedBalance.toFixed(2)}</span>
+                {bonusLeft && (
+                    <div className="mt-3 rounded-2xl border border-navy-400/30 bg-navy-500/10 px-3 py-3 sm:px-4">
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="flex min-w-0 items-center gap-2">
+                                <Clock className="h-4 w-4 shrink-0 text-navy-300" />
+                                <p className="truncate text-xs font-medium text-navy-100 sm:text-sm">Slot bonus (5%) in</p>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-1">
+                                <span className="rounded-md bg-navy-500/25 px-1.5 py-0.5 text-xs font-bold tabular-nums text-navy-200">{bonusLeft.h}</span>
+                                <span className="text-xs font-bold text-navy-300">:</span>
+                                <span className="rounded-md bg-navy-500/25 px-1.5 py-0.5 text-xs font-bold tabular-nums text-navy-200">{bonusLeft.m}</span>
+                                <span className="text-xs font-bold text-navy-300">:</span>
+                                <span className="rounded-md bg-navy-500/25 px-1.5 py-0.5 text-xs font-bold tabular-nums text-navy-200">{bonusLeft.s}</span>
+                            </div>
+                        </div>
+                        <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-white/10 pt-2">
+                            <p className="min-w-0 text-[10px] leading-relaxed text-[var(--text-dim)]">
+                                Credited 24 hours after your slot is approved. Buying again restarts the timer.
+                                {nextCommissionAt && nextCommissionAt !== bonusAt
+                                    ? ` Earlier slots land from ${formatNextCommission(nextCommissionAt)}.`
+                                    : ''}
+                            </p>
+                            {pendingCommission > 0 && (
+                                <span className="shrink-0 text-xs font-bold tabular-nums text-navy-300">₹{pendingCommission.toFixed(2)}</span>
+                            )}
+                        </div>
                     </div>
                 )}
 
-                {pendingCommission > 0 && (
-                    <div className="mt-3 flex items-center justify-between rounded-xl border border-navy-400/30 bg-navy-500/10 px-4 py-3 text-xs">
-                        <div>
-                            <p className="font-medium text-navy-200">Slot commission (5%) on the way</p>
-                            <p className="mt-0.5 text-[10px] text-[var(--text-dim)]">
-                                Credited 24 hours after approval
-                                {nextCommissionAt ? ` · next on ${new Date(nextCommissionAt).toLocaleString()}` : ''}
-                            </p>
-                        </div>
-                        <span className="shrink-0 font-bold text-navy-300">₹{pendingCommission.toFixed(2)}</span>
+                {lockedBalance > 0 && (
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl border border-amber-400/25 bg-amber-500/10 px-3 py-3 text-xs sm:px-4">
+                        <span className="min-w-0 text-amber-200/90">Locked until put on a slot</span>
+                        <span className="shrink-0 font-bold tabular-nums text-amber-300">₹{lockedBalance.toFixed(2)}</span>
                     </div>
                 )}
+
             </div>
 
             {/* Menu List */}
-            <div className="mt-6 space-y-3 px-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0 lg:grid-cols-3">
+            <div className="mt-6 space-y-3 px-3 sm:px-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0 lg:grid-cols-3">
                 {menuItems.map((item) => (
                     <button
                         key={item.name}
                         onClick={item.action}
-                        className="glass flex w-full items-center justify-between rounded-2xl p-4 transition-all hover:bg-white/[0.07] active:scale-[0.98]"
+                        className="glass flex w-full items-center justify-between gap-3 rounded-2xl p-3 transition-all hover:bg-white/[0.07] active:scale-[0.98] sm:p-4"
                     >
-                        <div className="flex items-center gap-4">
-                            <div className={`rounded-xl border border-white/10 bg-white/5 p-2 ${item.color}`}>
+                        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+                            <div className={`shrink-0 rounded-xl border border-white/10 bg-white/5 p-2 ${item.color}`}>
                                 <item.icon className="h-5 w-5" />
                             </div>
-                            <span className="text-sm font-medium text-white/90">{item.name}</span>
+                            <span className="truncate text-sm font-medium text-white/90">{item.name}</span>
                         </div>
-                        <ChevronRight className="h-4 w-4 text-[var(--text-dim)]" />
+                        <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-dim)]" />
                     </button>
                 ))}
 
                 <button
                     onClick={handleSignOut}
-                    className="glass mt-6 flex w-full items-center justify-between rounded-2xl p-4 text-red-400 transition-colors hover:bg-red-500/10"
+                    className="glass mt-6 flex w-full items-center justify-between gap-3 rounded-2xl p-3 text-red-400 transition-colors hover:bg-red-500/10 sm:p-4 md:mt-0"
                 >
-                    <div className="flex items-center gap-4">
-                        <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-2 text-red-400">
+                    <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+                        <div className="shrink-0 rounded-xl border border-red-500/20 bg-red-500/10 p-2 text-red-400">
                             <LogOut className="h-5 w-5" />
                         </div>
-                        <span className="text-sm font-medium">Logout</span>
+                        <span className="truncate text-sm font-medium">Logout</span>
                     </div>
-                    <ChevronRight className="h-4 w-4 text-[var(--text-dim)]" />
+                    <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-dim)]" />
                 </button>
             </div>
 
             {/* Withdrawal Modal */}
             {isWithdrawModalOpen && (
-                <div className="anim-fade fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-                    <div className="anim-pop glass-strong relative w-full max-w-sm rounded-3xl p-6 shadow-2xl">
+                <div className="anim-fade fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm sm:p-4">
+                    <div className="anim-pop glass-strong relative max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-3xl p-5 shadow-2xl sm:p-6">
                         <button
                             onClick={() => setIsWithdrawModalOpen(false)}
                             className="absolute right-4 top-4 text-[var(--text-dim)] hover:text-white"
@@ -232,16 +326,16 @@ export default function AssetsPage() {
                             <X className="h-6 w-6" />
                         </button>
 
-                        <div className="mb-6 text-center">
-                            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-purple-400/30 bg-purple-500/15 text-purple-300">
+                        <div className="mb-5 text-center sm:mb-6">
+                            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-purple-400/30 bg-purple-500/15 text-purple-300 sm:mb-4">
                                 <Banknote className="h-6 w-6" />
                             </div>
-                            <h2 className="text-xl font-bold text-white">Withdraw Funds</h2>
-                            <p className="mt-1 text-sm text-[var(--text-muted)]">Enter amount to withdraw</p>
+                            <h2 className="text-lg font-bold text-white sm:text-xl">Withdraw Funds</h2>
+                            <p className="mt-1 text-xs text-[var(--text-muted)] sm:text-sm">Enter amount to withdraw</p>
                         </div>
 
                         <form onSubmit={handleWithdrawal}>
-                            <div className="mb-6">
+                            <div className="mb-5 sm:mb-6">
                                 <label className="mb-2 block text-sm font-medium text-[var(--text-muted)]">Amount</label>
                                 <div className="relative">
                                     <span className="absolute left-4 top-1/2 -translate-y-1/2 font-medium text-[var(--text-muted)]">₹</span>
@@ -257,21 +351,21 @@ export default function AssetsPage() {
                                     />
                                 </div>
                                 <div className="mt-3 space-y-1.5 rounded-lg border border-white/10 bg-white/5 p-3 text-xs">
-                                    <div className="flex justify-between text-[var(--text-muted)]">
-                                        <span>Wallet Balance</span>
-                                        <span className="font-bold text-white">₹{Number(profile.balance || 0).toFixed(2)}</span>
+                                    <div className="flex justify-between gap-2 text-[var(--text-muted)]">
+                                        <span className="min-w-0">Wallet Balance</span>
+                                        <span className="shrink-0 font-bold tabular-nums text-white">₹{Number(profile.balance || 0).toFixed(2)}</span>
                                     </div>
-                                    <div className="flex justify-between text-[var(--text-muted)]">
-                                        <span>Locked (not on a slot yet)</span>
-                                        <span className="font-bold text-amber-400">₹{lockedBalance.toFixed(2)}</span>
-                                    </div>
-                                    <div className="flex justify-between border-t border-white/10 pt-1.5 text-[var(--text-muted)]">
-                                        <span>Withdrawable</span>
-                                        <span className="font-bold text-emerald-400">₹{withdrawableBalance.toFixed(2)}</span>
+                                    <div className="flex justify-between gap-2 text-[var(--text-muted)]">
+                                        <span className="min-w-0">Locked (not on a slot yet)</span>
+                                        <span className="shrink-0 font-bold tabular-nums text-amber-400">₹{lockedBalance.toFixed(2)}</span>
                                     </div>
                                     <div className="flex justify-between gap-2 border-t border-white/10 pt-1.5 text-[var(--text-muted)]">
-                                        <span>Payout UPI</span>
-                                        <span className="truncate font-bold text-white">{profile.payout_upi || 'Not set'}</span>
+                                        <span className="min-w-0">Withdrawable</span>
+                                        <span className="shrink-0 font-bold tabular-nums text-emerald-400">₹{withdrawableBalance.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between gap-2 border-t border-white/10 pt-1.5 text-[var(--text-muted)]">
+                                        <span className="shrink-0">Payout UPI</span>
+                                        <span className="min-w-0 truncate font-bold text-white">{profile.payout_upi || 'Not set'}</span>
                                     </div>
                                 </div>
 
@@ -284,9 +378,9 @@ export default function AssetsPage() {
                             </div>
 
                             {error && (
-                                <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
-                                    <div className="h-1 w-1 rounded-full bg-red-400" />
-                                    {error}
+                                <div className="mb-4 flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs leading-relaxed text-red-300 sm:text-sm">
+                                    <div className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-red-400" />
+                                    <span className="min-w-0">{error}</span>
                                 </div>
                             )}
 
@@ -308,8 +402,8 @@ export default function AssetsPage() {
 
             {/* Success Modal */}
             {isSuccessModalOpen && (
-                <div className="anim-fade fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-                    <div className="anim-pop glass-strong relative w-full max-w-sm rounded-3xl p-8 text-center shadow-2xl">
+                <div className="anim-fade fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm sm:p-4">
+                    <div className="anim-pop glass-strong relative max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-3xl p-6 text-center shadow-2xl sm:p-8">
                         <button
                             onClick={() => setIsSuccessModalOpen(false)}
                             className="absolute right-4 top-4 text-[var(--text-dim)] hover:text-white"
@@ -321,8 +415,8 @@ export default function AssetsPage() {
                             <CheckCircle className="h-8 w-8" />
                         </div>
 
-                        <h2 className="mb-2 text-2xl font-bold text-white">Success!</h2>
-                        <p className="mb-8 text-[var(--text-muted)]">
+                        <h2 className="mb-2 text-xl font-bold text-white sm:text-2xl">Success!</h2>
+                        <p className="mb-6 text-sm leading-relaxed text-[var(--text-muted)] sm:mb-8 sm:text-base">
                             Your withdrawal request is in processing and will be completed within 24 hours.
                         </p>
 

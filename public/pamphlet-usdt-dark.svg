@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 794 1123" width="794" height="1123"
+     role="img" aria-label="E Pay — invest in USDT"
+     font-family="'Segoe UI', system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif">
+  <title>E Pay — Invest in USDT (A4 flyer, dark)</title>
+
+  <defs>
+    <linearGradient id="pgBg" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="794" y2="1123">
+      <stop offset="0%" stop-color="#0b1120"/>
+      <stop offset="45%" stop-color="#070b13"/>
+      <stop offset="100%" stop-color="#05070b"/>
+    </linearGradient>
+
+    <radialGradient id="pgGlowA" gradientUnits="userSpaceOnUse" cx="120" cy="180" r="480">
+      <stop offset="0%" stop-color="#335EC9" stop-opacity="0.30"/>
+      <stop offset="100%" stop-color="#335EC9" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="pgGlowB" gradientUnits="userSpaceOnUse" cx="700" cy="960" r="420">
+      <stop offset="0%" stop-color="#26A17B" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#26A17B" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="pgTeal" gradientUnits="userSpaceOnUse" x1="48" y1="250" x2="420" y2="370">
+      <stop offset="0%" stop-color="#5EEAD4"/>
+      <stop offset="55%" stop-color="#2DD4A8"/>
+      <stop offset="100%" stop-color="#26A17B"/>
+    </linearGradient>
+
+    <linearGradient id="pgCta" gradientUnits="userSpaceOnUse" x1="48" y1="992" x2="746" y2="1060">
+      <stop offset="0%" stop-color="#2E55BE"/>
+      <stop offset="100%" stop-color="#152A61"/>
+    </linearGradient>
+
+    <linearGradient id="pgPlate" gradientUnits="userSpaceOnUse" x1="21" y1="30" x2="139" y2="173">
+      <stop offset="0%" stop-color="#6F93E6"/>
+      <stop offset="45%" stop-color="#335EC9"/>
+      <stop offset="100%" stop-color="#152A61"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="794" height="1123" fill="url(#pgBg)"/>
+  <rect width="794" height="1123" fill="url(#pgGlowA)"/>
+  <rect width="794" height="1123" fill="url(#pgGlowB)"/>
+
+  <!-- watermark tether glyph behind the headline block -->
+  <g opacity="0.06">
+    <circle cx="648" cy="300" r="132" fill="none" stroke="#5EEAD4" stroke-width="8"/>
+    <g fill="none" stroke="#5EEAD4" stroke-width="20" stroke-linecap="round">
+      <path d="M594 250 H702"/>
+      <path d="M648 250 V362"/>
+      <path d="M614 302 H682"/>
+    </g>
+  </g>
+
+  <!-- ===================== header logo ===================== -->
+  <g transform="translate(41,30) scale(0.34)">
+    <path d="M80 30 L139 52 V104 C139 140 112 163 80 173 C48 163 21 140 21 104 V52 Z" fill="url(#pgPlate)"/>
+    <g fill="none" stroke="#FFFFFF" stroke-width="13" stroke-linecap="round">
+      <path d="M60 68 V138"/><path d="M60 68 H96"/><path d="M60 103 H86"/><path d="M60 138 H100"/>
+    </g>
+    <g transform="translate(175,100) scale(0.82) translate(-41,-100)"
+       fill="none" stroke="#E7ECF5" stroke-width="21" stroke-linecap="square" stroke-linejoin="round">
+      <path d="M52 56 L52 144"/><path d="M52 56 L100 56"/><path d="M52 100 L90 100"/><path d="M52 144 L100 144"/>
+      <path d="M172 144 L172 56"/><path d="M172 56 L200 56 A22 22 0 0 1 200 100 L172 100"/>
+      <path d="M258 144 L294 56 L330 144"/><path d="M270 114 L318 114"/>
+      <path d="M362 56 L396 102"/><path d="M430 56 L396 102"/><path d="M396 102 L396 144"/>
+    </g>
+  </g>
+
+  <!-- ===================== headline ===================== -->
+  <text x="48" y="176" font-size="14" font-weight="700" letter-spacing="5.4" fill="#6F93E6">TRC20 &amp; BEP20 · MINIMUM 10 USDT · 24-HOUR PAYOUTS</text>
+
+  <text x="48" y="250" font-size="64" font-weight="300" letter-spacing="4" fill="#E7ECF5">INVEST IN</text>
+  <text x="48" y="356" font-size="126" font-weight="800" letter-spacing="-2" fill="url(#pgTeal)">USDT</text>
+  <rect x="50" y="382" width="118" height="6" rx="3" fill="url(#pgTeal)"/>
+
+  <text x="48" y="432" font-size="20" fill="#8A93A8">Send USDT on TRC20 or BEP20, and it lands in your E Pay wallet</text>
+  <text x="48" y="460" font-size="20" fill="#8A93A8">as rupees — plus a ₹3 bonus on every single USDT you deposit.</text>
+
+  <!-- ===================== three stat cards ===================== -->
+  <g>
+    <rect x="48"  y="500" width="222" height="160" rx="20" fill="#FFFFFF" fill-opacity="0.045" stroke="#FFFFFF" stroke-opacity="0.09"/>
+    <text x="72"  y="570" font-size="46" font-weight="800" fill="#5EEAD4">+₹3</text>
+    <text x="72"  y="606" font-size="14" fill="#8A93A8">bonus credited for</text>
+    <text x="72"  y="628" font-size="14" fill="#8A93A8">every 1 USDT deposited</text>
+
+    <rect x="286" y="500" width="222" height="160" rx="20" fill="#FFFFFF" fill-opacity="0.045" stroke="#FFFFFF" stroke-opacity="0.09"/>
+    <text x="310" y="570" font-size="46" font-weight="800" fill="#7DA2F0">5%</text>
+    <text x="310" y="606" font-size="14" fill="#8A93A8">commission on every</text>
+    <text x="310" y="628" font-size="14" fill="#8A93A8">approved slot purchase</text>
+
+    <rect x="524" y="500" width="222" height="160" rx="20" fill="#FFFFFF" fill-opacity="0.045" stroke="#FFFFFF" stroke-opacity="0.09"/>
+    <text x="548" y="570" font-size="46" font-weight="800" fill="#E7ECF5">24 h</text>
+    <text x="548" y="606" font-size="14" fill="#8A93A8">from approval to the</text>
+    <text x="548" y="628" font-size="14" fill="#8A93A8">commission in your wallet</text>
+  </g>
+
+  <!-- ===================== how it works ===================== -->
+  <text x="48" y="702" font-size="14" font-weight="700" letter-spacing="5" fill="#6F93E6">HOW IT WORKS</text>
+
+  <g>
+    <circle cx="64"  cy="738" r="17" fill="#2E55BE"/><text x="64"  y="744" font-size="15" font-weight="700" fill="#FFFFFF" text-anchor="middle">1</text>
+    <text x="90"  y="744" font-size="15" fill="#E7ECF5">Deposit USDT</text>
+
+    <circle cx="238" cy="738" r="17" fill="#2E55BE"/><text x="238" y="744" font-size="15" font-weight="700" fill="#FFFFFF" text-anchor="middle">2</text>
+    <text x="264" y="744" font-size="15" fill="#E7ECF5">Get ₹ + bonus</text>
+
+    <circle cx="412" cy="738" r="17" fill="#2E55BE"/><text x="412" y="744" font-size="15" font-weight="700" fill="#FFFFFF" text-anchor="middle">3</text>
+    <text x="438" y="744" font-size="15" fill="#E7ECF5">Pick a slot</text>
+
+    <circle cx="586" cy="738" r="17" fill="#26A17B"/><text x="586" y="744" font-size="15" font-weight="700" fill="#FFFFFF" text-anchor="middle">4</text>
+    <text x="612" y="744" font-size="15" fill="#E7ECF5">Earn 5%</text>
+  </g>
+
+  <!-- ===================== slot table ===================== -->
+  <rect x="48" y="776" width="698" height="196" rx="20" fill="#FFFFFF" fill-opacity="0.045" stroke="#FFFFFF" stroke-opacity="0.09"/>
+  <text x="76"  y="810" font-size="13" font-weight="700" letter-spacing="3.4" fill="#8A93A8">SLOT AMOUNT</text>
+  <text x="718" y="810" font-size="13" font-weight="700" letter-spacing="3.4" fill="#8A93A8" text-anchor="end">COMMISSION AFTER 24 H</text>
+  <path d="M76 826 H718" stroke="#FFFFFF" stroke-opacity="0.12"/>
+
+  <g font-size="17">
+    <text x="76"  y="858" fill="#E7ECF5">₹1,000</text>  <text x="718" y="858" fill="#5EEAD4" font-weight="700" text-anchor="end">₹50</text>
+    <text x="76"  y="886" fill="#E7ECF5">₹2,000</text>  <text x="718" y="886" fill="#5EEAD4" font-weight="700" text-anchor="end">₹100</text>
+    <text x="76"  y="914" fill="#E7ECF5">₹5,000</text>  <text x="718" y="914" fill="#5EEAD4" font-weight="700" text-anchor="end">₹250</text>
+    <text x="76"  y="942" fill="#E7ECF5">₹7,000</text>  <text x="718" y="942" fill="#5EEAD4" font-weight="700" text-anchor="end">₹350</text>
+    <text x="76"  y="964" fill="#E7ECF5">₹10,000</text> <text x="718" y="964" fill="#5EEAD4" font-weight="700" text-anchor="end">₹500</text>
+  </g>
+
+  <!-- ===================== call to action ===================== -->
+  <rect x="48" y="992" width="698" height="68" rx="20" fill="url(#pgCta)"/>
+  <text x="76" y="1022" font-size="20" font-weight="700" fill="#FFFFFF">Open your USDT wallet on E Pay</text>
+  <text x="76" y="1045" font-size="14" fill="#A9C0F5">Support &amp; invite links on Telegram — t.me/ZPayService</text>
+  <circle cx="702" cy="1026" r="22" fill="#FFFFFF" fill-opacity="0.14"/>
+  <path d="M694 1026 H710 M704 1020 L710 1026 L704 1032" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- ===================== disclosure ===================== -->
+  <text x="48" y="1086" font-size="11.5" fill="#5B6478">The 5% commission is credited 24 hours after a slot purchase is approved, and it arrives as locked balance — it must be placed</text>
+  <text x="48" y="1102" font-size="11.5" fill="#5B6478">on a slot before it can be withdrawn. Deposit rate and bonus are set in-app and can change. Crypto prices move: commit only what you can set aside.</text>
+</svg>

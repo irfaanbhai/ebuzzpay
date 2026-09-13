@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 240" width="640" height="240" role="img" aria-label="E Pay">
+  <title>E Pay — USDT token lockup</title>
+
+  <defs>
+    <linearGradient id="tkBg" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="640" y2="240">
+      <stop offset="0%" stop-color="#0d1320"/>
+      <stop offset="55%" stop-color="#070b13"/>
+      <stop offset="100%" stop-color="#05070b"/>
+    </linearGradient>
+
+    <radialGradient id="tkGlow" gradientUnits="userSpaceOnUse" cx="124" cy="120" r="150">
+      <stop offset="0%" stop-color="#335EC9" stop-opacity="0.38"/>
+      <stop offset="100%" stop-color="#335EC9" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="tkCoin" gradientUnits="userSpaceOnUse" x1="60" y1="52" x2="188" y2="188">
+      <stop offset="0%" stop-color="#7DA2F0"/>
+      <stop offset="48%" stop-color="#335EC9"/>
+      <stop offset="100%" stop-color="#152A61"/>
+    </linearGradient>
+
+    <linearGradient id="tkTether" gradientUnits="userSpaceOnUse" x1="97" y1="88" x2="151" y2="155">
+      <stop offset="0%" stop-color="#5EEAD4"/>
+      <stop offset="100%" stop-color="#26A17B"/>
+    </linearGradient>
+
+    <linearGradient id="tkWord" gradientUnits="userSpaceOnUse" x1="258" y1="60" x2="578" y2="148">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="52%" stop-color="#A9C0F5"/>
+      <stop offset="100%" stop-color="#5B85E8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- tile -->
+  <rect x="0" y="0" width="640" height="240" rx="44" fill="url(#tkBg)"/>
+  <rect x="0" y="0" width="640" height="240" rx="44" fill="url(#tkGlow)"/>
+  <rect x="1" y="1" width="638" height="238" rx="43" fill="none" stroke="#FFFFFF" stroke-opacity="0.09"/>
+
+  <!-- orbit: value circulating in and out of the token -->
+  <circle cx="124" cy="120" r="90" fill="none" stroke="#5B85E8" stroke-opacity="0.35"
+          stroke-width="2" stroke-dasharray="13 11" stroke-linecap="round"/>
+
+  <!-- coin -->
+  <circle cx="124" cy="120" r="74" fill="url(#tkCoin)"/>
+  <circle cx="124" cy="120" r="74" fill="none" stroke="#FFFFFF" stroke-opacity="0.2" stroke-width="2"/>
+  <circle cx="124" cy="120" r="58" fill="#070b13"/>
+
+  <!-- Tether mark, drawn as strokes so the file carries no font dependency -->
+  <g fill="none" stroke="url(#tkTether)" stroke-width="11" stroke-linecap="round">
+    <path d="M97 93 H151"/>
+    <path d="M124 93 V152"/>
+    <path d="M107 120 H141"/>
+  </g>
+
+  <!-- wordmark -->
+  <g transform="translate(258,104) scale(0.8) translate(-41,-100)"
+     fill="none" stroke="url(#tkWord)" stroke-width="21" stroke-linecap="square" stroke-linejoin="round">
+    <!-- E -->
+    <path d="M52 56 L52 144"/>
+    <path d="M52 56 L100 56"/>
+    <path d="M52 100 L90 100"/>
+    <path d="M52 144 L100 144"/>
+    <!-- P -->
+    <path d="M172 144 L172 56"/>
+    <path d="M172 56 L200 56 A22 22 0 0 1 200 100 L172 100"/>
+    <!-- A -->
+    <path d="M258 144 L294 56 L330 144"/>
+    <path d="M270 114 L318 114"/>
+    <!-- Y -->
+    <path d="M362 56 L396 102"/>
+    <path d="M430 56 L396 102"/>
+    <path d="M396 102 L396 144"/>
+  </g>
+
+  <text x="260" y="180" font-family="'Segoe UI', system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif"
+        font-size="17" font-weight="600" letter-spacing="5.2" fill="#8A93A8">SECURE USDT PAYMENTS</text>
+</svg>

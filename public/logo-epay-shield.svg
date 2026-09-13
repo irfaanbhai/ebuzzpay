@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 545 200" width="545" height="200" role="img" aria-label="E Pay">
+  <title>E Pay — shield lockup</title>
+
+  <defs>
+    <!-- userSpaceOnUse everywhere: bounding-box gradients collapse on the flat
+         vertical / horizontal strokes the letterforms are built from -->
+    <linearGradient id="shPlate" gradientUnits="userSpaceOnUse" x1="21" y1="30" x2="139" y2="173">
+      <stop offset="0%" stop-color="#6F93E6"/>
+      <stop offset="45%" stop-color="#335EC9"/>
+      <stop offset="100%" stop-color="#152A61"/>
+    </linearGradient>
+
+    <linearGradient id="shSheen" gradientUnits="userSpaceOnUse" x1="21" y1="30" x2="90" y2="120">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- mid-navy so the wordmark holds up on both the app's black and on paper -->
+    <linearGradient id="shWord" gradientUnits="userSpaceOnUse" x1="190" y1="55" x2="518" y2="145">
+      <stop offset="0%" stop-color="#5B85E8"/>
+      <stop offset="55%" stop-color="#2E55BE"/>
+      <stop offset="100%" stop-color="#1C3680"/>
+    </linearGradient>
+
+    <clipPath id="shClip">
+      <path d="M80 30 L139 52 V104 C139 140 112 163 80 173 C48 163 21 140 21 104 V52 Z"/>
+    </clipPath>
+  </defs>
+
+  <!-- shield -->
+  <g>
+    <path d="M80 30 L139 52 V104 C139 140 112 163 80 173 C48 163 21 140 21 104 V52 Z" fill="url(#shPlate)"/>
+    <path d="M80 30 L139 52 V104 C139 140 112 163 80 173 C48 163 21 140 21 104 V52 Z"
+          fill="url(#shSheen)" clip-path="url(#shClip)"/>
+    <path d="M80 30 L139 52 V104 C139 140 112 163 80 173 C48 163 21 140 21 104 V52 Z"
+          fill="none" stroke="#FFFFFF" stroke-opacity="0.22" stroke-width="2"/>
+
+    <!-- ascending bars: growth held inside the shield. Deliberately NOT an "E" —
+         a monogram here would read as "E EPAY" against the wordmark. -->
+    <rect x="51" y="112" width="14" height="30" rx="7" fill="#FFFFFF"/>
+    <rect x="73" y="92"  width="14" height="50" rx="7" fill="#FFFFFF"/>
+    <rect x="95" y="68"  width="14" height="74" rx="7" fill="#5EEAD4"/>
+  </g>
+
+  <!-- wordmark: same stroked letterforms as the original E Pay mark, upright -->
+  <g transform="translate(190,100) scale(0.82) translate(-41,-100)"
+     fill="none" stroke="url(#shWord)" stroke-width="21" stroke-linecap="square" stroke-linejoin="round">
+    <!-- E -->
+    <path d="M52 56 L52 144"/>
+    <path d="M52 56 L100 56"/>
+    <path d="M52 100 L90 100"/>
+    <path d="M52 144 L100 144"/>
+    <!-- P -->
+    <path d="M172 144 L172 56"/>
+    <path d="M172 56 L200 56 A22 22 0 0 1 200 100 L172 100"/>
+    <!-- A -->
+    <path d="M258 144 L294 56 L330 144"/>
+    <path d="M270 114 L318 114"/>
+    <!-- Y -->
+    <path d="M362 56 L396 102"/>
+    <path d="M430 56 L396 102"/>
+    <path d="M396 102 L396 144"/>
+  </g>
+</svg>
