@@ -27,8 +27,8 @@ export default function DepositPage() {
     const [isSubmitting, setIsSubmitting] = useState(false)
 
     // Admin addresses (Placeholders as requested)
-    const TRC20_ADDRESS = "TJVPaAuKRnHhMY56QGjPt2bcVySebqDAk1"
-    const BEP20_ADDRESS = "0x54d3627E04997c5a0E32CEc79eeB6CcBD6369e62"
+    const TRC20_ADDRESS = "TR3aSADssGoD682MvUC5vgZeaX2qWnkWkD"
+    const BEP20_ADDRESS = "0x31A1F4c298dc3F1024107e2868bA0fE4AEcCAaF5"
 
     useEffect(() => {
         const fetchSettings = async () => {

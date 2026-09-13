@@ -1,8 +1,40 @@
 'use client'
 
-import { Users, Copy, Share2, Facebook, Send, QrCode } from 'lucide-react'
+import { Users, Copy, Share2, Facebook, Send, QrCode, Check, X } from 'lucide-react'
+import { QRCodeSVG } from 'qrcode.react'
 import { createClient } from '@/utils/supabase/client'
 import { useEffect, useState } from 'react'
+
+const INVITE_TEXT = 'Join me and start earning! Sign up with my invite link:'
+
+// navigator.clipboard only exists on secure origins (https / localhost),
+// so fall back to the old textarea trick when opened over plain http.
+const copyText = async (text) => {
+    if (navigator.clipboard && window.isSecureContext) {
+        try {
+            await navigator.clipboard.writeText(text)
+            return true
+        } catch {
+            // permission denied etc. - try the fallback below
+        }
+    }
+
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    textarea.setAttribute('readonly', '')
+    textarea.style.position = 'fixed'
+    textarea.style.opacity = '0'
+    document.body.appendChild(textarea)
+    textarea.select()
+    let ok = false
+    try {
+        ok = document.execCommand('copy')
+    } catch {
+        ok = false
+    }
+    document.body.removeChild(textarea)
+    return ok
+}
 
 export default function TeamsPage() {
     const [stats, setStats] = useState({
@@ -20,7 +52,17 @@ export default function TeamsPage() {
     })
     const [referralCode, setReferralCode] = useState('')
     const [loading, setLoading] = useState(true)
+    const [origin, setOrigin] = useState('')
+    const [copied, setCopied] = useState(false)
+    const [isQrOpen, setIsQrOpen] = useState(false)
     const supabase = createClient()
+
+    // window only exists in the browser; reading it during render breaks hydration
+    useEffect(() => {
+        setOrigin(window.location.origin)
+    }, [])
+
+    const inviteLink = referralCode && origin ? `${origin}/register?ref=${referralCode}` : ''
 
     useEffect(() => {
         fetchTeamData()
@@ -50,11 +92,59 @@ export default function TeamsPage() {
         setLoading(false)
     }
 
-    const copyToClipboard = () => {
-        const link = `${window.location.origin}/register?ref=${referralCode}`
-        navigator.clipboard.writeText(link)
-        alert('Invitation link copied!')
+    const copyToClipboard = async () => {
+        if (!inviteLink) return
+        if (await copyText(inviteLink)) {
+            setCopied(true)
+            setTimeout(() => setCopied(false), 2000)
+        } else {
+            // Last resort: let the user copy it by hand
+            window.prompt('Copy your invitation link:', inviteLink)
+        }
     }
+
+    const openShareWindow = (url) => {
+        window.open(url, '_blank', 'noopener,noreferrer')
+    }
+
+    const shareNative = async () => {
+        if (!inviteLink) return
+        if (navigator.share) {
+            try {
+                await navigator.share({ title: 'Invitation', text: INVITE_TEXT, url: inviteLink })
+            } catch {
+                // user closed the share sheet - nothing to do
+            }
+        } else {
+            copyToClipboard()
+        }
+    }
+
+    const encodedLink = encodeURIComponent(inviteLink)
+    const encodedText = encodeURIComponent(INVITE_TEXT)
+
+    const shareOptions = [
+        {
+            name: 'Facebook',
+            icon: Facebook,
+            color: 'text-navy-300',
+            action: () => openShareWindow(`https://www.facebook.com/sharer/sharer.php?u=${encodedLink}`),
+        },
+        {
+            name: 'Telegram',
+            icon: Send,
+            color: 'text-sky-300',
+            action: () => openShareWindow(`https://t.me/share/url?url=${encodedLink}&text=${encodedText}`),
+        },
+        {
+            name: 'WhatsApp',
+            icon: Share2,
+            color: 'text-emerald-300',
+            action: () => openShareWindow(`https://wa.me/?text=${encodeURIComponent(`${INVITE_TEXT} ${inviteLink}`)}`),
+        },
+        { name: 'QR Code', icon: QrCode, color: 'text-purple-300', action: () => setIsQrOpen(true) },
+        { name: 'Share', icon: Share2, color: 'text-red-300', action: shareNative },
+    ]
 
     return (
         <div className="min-h-screen pb-28">
@@ -114,16 +204,20 @@ export default function TeamsPage() {
                         </p>
                     )}
                     <div className="flex gap-2">
-                        <div className="flex-1 truncate rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-[var(--text-muted)]">
-                            {referralCode ? `${typeof window !== 'undefined' ? window.location.origin : ''}/register?ref=${referralCode}` : 'Loading...'}
+                        <div className="min-w-0 flex-1 truncate rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-[var(--text-muted)]">
+                            {inviteLink || 'Loading...'}
                         </div>
                         <button
+                            type="button"
                             onClick={copyToClipboard}
-                            className="btn-navy rounded-xl p-3"
+                            disabled={!inviteLink}
+                            aria-label="Copy invitation link"
+                            className="btn-navy shrink-0 rounded-xl p-3 disabled:opacity-60"
                         >
-                            <Copy className="h-5 w-5" />
+                            {copied ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
                         </button>
                     </div>
+                    {copied && <p className="mt-2 text-xs font-medium text-emerald-400">Invitation link copied!</p>}
                 </div>
             </div>
 
@@ -131,15 +225,15 @@ export default function TeamsPage() {
             <div className="mt-6 px-4">
                 <h3 className="mb-4 text-sm font-semibold text-white/90">More Ways To Invite</h3>
                 <div className="flex justify-between gap-2">
-                    {[
-                        { name: 'Facebook', icon: Facebook, color: 'text-navy-300' },
-                        { name: 'Telegram', icon: Send, color: 'text-sky-300' },
-                        { name: 'WhatsApp', icon: Share2, color: 'text-emerald-300' },
-                        { name: 'QR Code', icon: QrCode, color: 'text-purple-300' },
-                        { name: 'Share', icon: Share2, color: 'text-red-300' },
-                    ].map((item) => (
+                    {shareOptions.map((item) => (
                         <div key={item.name} className="flex flex-col items-center gap-2">
-                            <button className={`glass flex h-12 w-12 items-center justify-center rounded-full ${item.color}`}>
+                            <button
+                                type="button"
+                                onClick={item.action}
+                                disabled={!inviteLink}
+                                aria-label={`Invite via ${item.name}`}
+                                className={`glass flex h-12 w-12 items-center justify-center rounded-full transition-all active:scale-95 disabled:opacity-60 ${item.color}`}
+                            >
                                 <item.icon className="h-5 w-5" />
                             </button>
                             <span className="text-xs text-[var(--text-muted)]">{item.name}</span>
@@ -223,6 +317,46 @@ export default function TeamsPage() {
                     ))}
                 </div>
             </div>
+
+            {/* QR Code Modal */}
+            {isQrOpen && inviteLink && (
+                <div
+                    className="anim-fade fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm sm:p-4"
+                    onClick={() => setIsQrOpen(false)}
+                >
+                    <div
+                        className="anim-pop glass-strong relative max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-3xl p-6 text-center shadow-2xl"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <button
+                            type="button"
+                            onClick={() => setIsQrOpen(false)}
+                            aria-label="Close"
+                            className="absolute right-4 top-4 text-[var(--text-dim)] hover:text-white"
+                        >
+                            <X className="h-6 w-6" />
+                        </button>
+
+                        <h2 className="mb-1 text-lg font-bold text-white sm:text-xl">Scan to Join</h2>
+                        <p className="mb-5 text-xs text-[var(--text-muted)] sm:text-sm">Let your friend scan this code to sign up on your team</p>
+
+                        <div className="mx-auto mb-5 w-fit rounded-2xl bg-white p-3">
+                            <QRCodeSVG value={inviteLink} size={200} />
+                        </div>
+
+                        <p className="mb-5 break-all text-[10px] text-[var(--text-dim)] sm:text-xs">{inviteLink}</p>
+
+                        <button
+                            type="button"
+                            onClick={copyToClipboard}
+                            className="btn-navy flex w-full items-center justify-center gap-2 rounded-xl py-3 font-bold"
+                        >
+                            {copied ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
+                            {copied ? 'Copied!' : 'Copy Link'}
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
