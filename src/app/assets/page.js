@@ -22,6 +22,9 @@ export default function AssetsPage() {
     const [todayEarnings, setTodayEarnings] = useState(0.00)
     const [pendingCommission, setPendingCommission] = useState(0.00)
     const [nextCommissionAt, setNextCommissionAt] = useState(null)
+    const [withdrawUnlockAt, setWithdrawUnlockAt] = useState(null)
+    const [withdrawalsToday, setWithdrawalsToday] = useState(0)
+    const [withdrawalDailyLimit, setWithdrawalDailyLimit] = useState(3)
 
     // Withdrawal State
     const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false)
@@ -46,6 +49,9 @@ export default function AssetsPage() {
             }))
             setPendingCommission(Number(summary.pending_commission || 0))
             setNextCommissionAt(summary.next_commission_at)
+            setWithdrawUnlockAt(summary.withdraw_unlock_at || null)
+            setWithdrawalsToday(Number(summary.withdrawals_today || 0))
+            if (summary.withdrawal_daily_limit) setWithdrawalDailyLimit(Number(summary.withdrawal_daily_limit))
         }
 
         // Fetch Today's Earnings
@@ -97,6 +103,8 @@ export default function AssetsPage() {
 
     const lockedBalance = Number(profile.locked_balance || 0)
     const withdrawableBalance = Math.max(0, Number(profile.balance || 0) - lockedBalance)
+    const withdrawalsLeft = Math.max(0, withdrawalDailyLimit - withdrawalsToday)
+    const depositHoldActive = withdrawUnlockAt && new Date(withdrawUnlockAt).getTime() > Date.now()
 
     const handleWithdrawal = async (e) => {
         e.preventDefault()
@@ -114,11 +122,17 @@ export default function AssetsPage() {
             if (!profile.payout_upi) {
                 throw new Error('Buy a slot first. Withdrawals are paid only to the UPI ID you deposited from.')
             }
+            if (depositHoldActive) {
+                throw new Error(`You can withdraw 24 hours after your last deposit. Withdrawal opens at ${formatNextCommission(withdrawUnlockAt)}.`)
+            }
+            if (withdrawalsLeft <= 0) {
+                throw new Error(`You can make only ${withdrawalDailyLimit} withdrawals per day. Try again tomorrow.`)
+            }
             if (amount > withdrawableBalance) {
                 throw new Error(`₹${lockedBalance.toFixed(2)} of your balance has not been used on a slot yet. Put it on a slot before withdrawing.`)
             }
 
-            // Server re-checks the locked balance and the registered UPI ID
+            // Server re-checks the deposit hold, daily limit, locked balance and UPI ID
             const { error: txError } = await supabase.rpc('request_withdrawal', { p_amount: amount })
 
             if (txError) throw txError
@@ -136,7 +150,7 @@ export default function AssetsPage() {
                 .eq('id', user.id)
                 .single()
             if (updatedProfile) setProfile(updatedProfile)
-
+            await loadWallet(user.id)
 
         } catch (err) {
             setError(err.message)
@@ -147,7 +161,7 @@ export default function AssetsPage() {
 
     const menuItems = [
         { name: 'Deposit', icon: Wallet, color: 'text-navy-300', action: () => router.push('/deposit') },
-        { name: 'Withdrawal', icon: Banknote, color: 'text-purple-400', action: () => setIsWithdrawModalOpen(true) }, // Added Withdrawal Button
+        { name: 'Withdrawal', icon: Banknote, color: 'text-purple-400', action: () => { setError(''); setIsWithdrawModalOpen(true); loadWallet(user.id) } },
         { name: 'Quota History', icon: History, color: 'text-[var(--text-muted)]', action: () => router.push('/history/quota') },
         { name: 'Deposit History', icon: RotateCw, color: 'text-emerald-400', action: () => router.push('/history/deposit') },
         { name: 'Withdrawal History', icon: RotateCw, color: 'text-red-400', action: () => router.push('/history/withdrawal') },
@@ -315,11 +329,25 @@ export default function AssetsPage() {
                                         <span className="min-w-0">Withdrawable</span>
                                         <span className="shrink-0 font-bold tabular-nums text-emerald-400">₹{withdrawableBalance.toFixed(2)}</span>
                                     </div>
+                                    <div className="flex justify-between gap-2 text-[var(--text-muted)]">
+                                        <span className="min-w-0">Withdrawals left today</span>
+                                        <span className={`shrink-0 font-bold tabular-nums ${withdrawalsLeft > 0 ? 'text-white' : 'text-red-400'}`}>{withdrawalsLeft} / {withdrawalDailyLimit}</span>
+                                    </div>
                                     <div className="flex justify-between gap-2 border-t border-white/10 pt-1.5 text-[var(--text-muted)]">
                                         <span className="shrink-0">Payout UPI</span>
                                         <span className="min-w-0 truncate font-bold text-white">{profile.payout_upi || 'Not set'}</span>
                                     </div>
                                 </div>
+
+                                {depositHoldActive && (
+                                    <p className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-amber-300/90">
+                                        <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                        <span className="min-w-0">
+                                            Withdrawal opens 24 hours after your last deposit, at {formatNextCommission(withdrawUnlockAt)}.
+                                            A new deposit restarts the 24 hours.
+                                        </span>
+                                    </p>
+                                )}
 
                                 {lockedBalance > 0 && (
                                     <p className="mt-2 text-xs leading-relaxed text-amber-300/90">
@@ -338,11 +366,15 @@ export default function AssetsPage() {
 
                             <button
                                 type="submit"
-                                disabled={isProcessing}
+                                disabled={isProcessing || depositHoldActive || withdrawalsLeft <= 0}
                                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500 to-purple-700 py-3.5 font-bold text-white shadow-[0_10px_30px_-8px_rgba(168,85,247,0.6)] transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
                             >
                                 {isProcessing ? (
                                     <>Processing...</>
+                                ) : depositHoldActive ? (
+                                    <>Withdrawal locked</>
+                                ) : withdrawalsLeft <= 0 ? (
+                                    <>Daily limit reached</>
                                 ) : (
                                     <>Submit Request</>
                                 )}
