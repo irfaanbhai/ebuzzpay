@@ -144,16 +144,19 @@ begin
       where id = txn.user_id;
 
     -- 5% slot commission, payable 24 hours from now
+    -- (no ON CONFLICT here: "transaction_id" would clash with this
+    -- function's parameter of the same name)
     insert into public.slot_commissions (user_id, transaction_id, slot_amount, amount, rate, mature_at)
-    values (
+    select
       txn.user_id,
       txn.id,
       final_amount,
       round(final_amount * 0.05, 2),
       0.05,
       now() + interval '24 hours'
-    )
-    on conflict (transaction_id) do nothing;
+    where not exists (
+      select 1 from public.slot_commissions sc where sc.transaction_id = txn.id
+    );
 
     -- Referral bonus for whoever invited this user
     select referrer_id into v_referrer from public.profiles where id = txn.user_id;
