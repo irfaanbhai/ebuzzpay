@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
 
-// A slot's 5% commission is credited 24 hours after the slot is approved.
-// Buying another slot while that wait is running restarts the timer, so a
-// "cycle" is a run of slots each approved before the previous one matured.
+// Every approved slot earns 5% each 24 hours until the user withdraws.
+// After each payout the next 24 hours start, so the timer counts down to
+// the soonest upcoming payout across all running slots.
 export const SLOT_WAIT_MS = 24 * 60 * 60 * 1000
 
 const pad = (n) => String(n).padStart(2, '0')
@@ -25,9 +25,9 @@ const STOPPED = { endsAt: null, total: 0 }
  * Shared slot timer for the Home and Assets pages.
  *
  * Returns:
- *   endsAt  - ms timestamp the running timer ends at, or null when stopped
+ *   endsAt  - ms timestamp of the next 5% payout, or null when stopped
  *   left    - { h, m, s } still to go, or null when stopped
- *   total   - INR placed on slots during the running cycle (0 when stopped)
+ *   total   - INR on slots that are still earning (0 when stopped)
  *   refresh - re-read the slots, e.g. after a purchase
  *
  * `onExpire` runs once when a running timer reaches zero.
@@ -50,11 +50,13 @@ export function useSlotCycle(userId, onExpire) {
         let ignore = false
 
         const load = async () => {
+            // credited_at stays empty while the bonus keeps repeating;
+            // a withdrawal fills it in and stops the bonus
             const { data: slots, error } = await supabase
                 .from('slot_commissions')
                 .select('slot_amount, mature_at')
                 .eq('user_id', userId)
-                .order('mature_at', { ascending: false })
+                .is('credited_at', null)
                 .limit(100)
 
             if (ignore) return
@@ -66,24 +68,20 @@ export function useSlotCycle(userId, onExpire) {
                 return
             }
 
-            const latest = new Date(slots[0].mature_at).getTime()
-            if (latest <= fetchedAt) {
-                // Last slot has already matured - stopped until the next purchase
-                setCycle(STOPPED)
-                return
-            }
-
-            // Walk back through the slots that kept restarting the timer
+            let endsAt = null
             let total = 0
-            let later = null
             for (const slot of slots) {
-                const at = new Date(slot.mature_at).getTime()
-                if (later !== null && later - at >= SLOT_WAIT_MS) break
+                let at = new Date(slot.mature_at).getTime()
+                // Due but not settled by the server yet - that payout is
+                // happening now, so count down to the one after it
+                if (at <= fetchedAt) {
+                    at += Math.ceil((fetchedAt - at + 1) / SLOT_WAIT_MS) * SLOT_WAIT_MS
+                }
+                if (endsAt === null || at < endsAt) endsAt = at
                 total += Number(slot.slot_amount || 0)
-                later = at
             }
 
-            setCycle({ endsAt: latest, total })
+            setCycle({ endsAt, total })
         }
 
         load()

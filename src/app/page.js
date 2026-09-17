@@ -23,9 +23,9 @@ export default function Home() {
   const router = useRouter()
   const supabase = createClient()
 
-  // Same timer as the Assets page: stopped until a slot purchase, then runs
-  // 24h (a new purchase restarts it). The recharge total follows that cycle
-  // and only counts the paid amount, not any bonus on top.
+  // Same timer as the Assets page: stopped until a slot purchase, then
+  // counts down to the next 5% payout, restarting after each one until the
+  // user withdraws. The total is the paid amount still earning, no bonus.
   const { left: cycleLeft, total: todayRecharge } = useSlotCycle(user?.id)
 
   useEffect(() => {
@@ -144,11 +144,11 @@ export default function Home() {
           <div className="mb-1 flex items-center justify-between">
             <h3 className="text-base font-bold text-white">Invest in INR</h3>
             <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-[10px] font-bold text-emerald-300">
-              5% in 24h
+              5% every 24h
             </span>
           </div>
           <p className="mb-4 text-xs text-[var(--text-dim)]">
-            Pick a slot and pay by UPI. Commission is credited 24 hours after approval.
+            Pick a slot and pay by UPI. You get 5% every 24 hours after approval until you withdraw.
           </p>
 
           <div className="space-y-3">
@@ -166,7 +166,7 @@ export default function Home() {
                       ₹{amount.toLocaleString('en-IN')}
                     </p>
                     <p className="mt-0.5 text-xs text-[var(--text-dim)]">
-                      Income: ₹{(amount * BONUS_RATE).toLocaleString('en-IN')} (5% after 24h)
+                      Income: ₹{(amount * BONUS_RATE).toLocaleString('en-IN')} every 24h
                     </p>
                   </div>
                 </div>

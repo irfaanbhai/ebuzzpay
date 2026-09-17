@@ -16,15 +16,25 @@ const formatNextCommission = (value) =>
         minute: '2-digit',
     })
 
+// Withdrawals are accepted 10:00 AM - 5:00 PM IST (server enforces it too)
+const WITHDRAW_OPEN_HOUR = 10
+const WITHDRAW_CLOSE_HOUR = 17
+const WITHDRAW_WINDOW_LABEL = '10:00 AM to 5:00 PM'
+
+const isWithdrawWindowOpen = () => {
+    const hour = Number(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata', hour: 'numeric', hourCycle: 'h23' }))
+    return hour >= WITHDRAW_OPEN_HOUR && hour < WITHDRAW_CLOSE_HOUR
+}
+
 export default function AssetsPage() {
     const [user, setUser] = useState(null)
     const [profile, setProfile] = useState({ balance: 0.00, locked_balance: 0.00, payout_upi: null })
     const [todayEarnings, setTodayEarnings] = useState(0.00)
     const [pendingCommission, setPendingCommission] = useState(0.00)
-    const [nextCommissionAt, setNextCommissionAt] = useState(null)
     const [withdrawUnlockAt, setWithdrawUnlockAt] = useState(null)
     const [withdrawalsToday, setWithdrawalsToday] = useState(0)
     const [withdrawalDailyLimit, setWithdrawalDailyLimit] = useState(3)
+    const [withdrawWindowOpen, setWithdrawWindowOpen] = useState(isWithdrawWindowOpen)
 
     // Withdrawal State
     const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false)
@@ -48,10 +58,10 @@ export default function AssetsPage() {
                 payout_upi: summary.payout_upi
             }))
             setPendingCommission(Number(summary.pending_commission || 0))
-            setNextCommissionAt(summary.next_commission_at)
             setWithdrawUnlockAt(summary.withdraw_unlock_at || null)
             setWithdrawalsToday(Number(summary.withdrawals_today || 0))
             if (summary.withdrawal_daily_limit) setWithdrawalDailyLimit(Number(summary.withdrawal_daily_limit))
+            setWithdrawWindowOpen(isWithdrawWindowOpen())
         }
 
         // Fetch Today's Earnings
@@ -82,7 +92,7 @@ export default function AssetsPage() {
 
     // Same timer as the Home page. When it hits zero, re-read the wallet so
     // the server credits the matured commission and the figures refresh.
-    const { endsAt: bonusAt, left: bonusLeft } = useSlotCycle(user?.id, () => {
+    const { left: bonusLeft } = useSlotCycle(user?.id, () => {
         if (user) loadWallet(user.id)
     })
 
@@ -122,6 +132,10 @@ export default function AssetsPage() {
             if (!profile.payout_upi) {
                 throw new Error('Buy a slot first. Withdrawals are paid only to the UPI ID you deposited from.')
             }
+            if (!isWithdrawWindowOpen()) {
+                setWithdrawWindowOpen(false)
+                throw new Error(`Withdrawals are open only from ${WITHDRAW_WINDOW_LABEL} IST.`)
+            }
             if (depositHoldActive) {
                 throw new Error(`You can withdraw 24 hours after your last deposit. Withdrawal opens at ${formatNextCommission(withdrawUnlockAt)}.`)
             }
@@ -132,7 +146,7 @@ export default function AssetsPage() {
                 throw new Error(`₹${lockedBalance.toFixed(2)} of your balance has not been used on a slot yet. Put it on a slot before withdrawing.`)
             }
 
-            // Server re-checks the deposit hold, daily limit, locked balance and UPI ID
+            // Server re-checks the time window, deposit hold, daily limit, locked balance and UPI ID
             const { error: txError } = await supabase.rpc('request_withdrawal', { p_amount: amount })
 
             if (txError) throw txError
@@ -228,11 +242,8 @@ export default function AssetsPage() {
                     <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-white/10 pt-2">
                         <p className="min-w-0 text-[10px] leading-relaxed text-[var(--text-dim)]">
                             {bonusLeft
-                                ? 'Credited 24 hours after your slot is approved. Buying again restarts the timer.'
+                                ? 'You get 5% every 24 hours until you withdraw. The timer restarts after each payout.'
                                 : 'Timer starts when your slot purchase is approved.'}
-                            {bonusAt && nextCommissionAt && new Date(nextCommissionAt).getTime() < bonusAt
-                                ? ` Earlier slots land from ${formatNextCommission(nextCommissionAt)}.`
-                                : ''}
                         </p>
                         {pendingCommission > 0 && (
                             <span className="shrink-0 text-xs font-bold tabular-nums text-navy-300">₹{pendingCommission.toFixed(2)}</span>
@@ -339,6 +350,21 @@ export default function AssetsPage() {
                                     </div>
                                 </div>
 
+                                {!withdrawWindowOpen && (
+                                    <p className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-amber-300/90">
+                                        <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                        <span className="min-w-0">
+                                            Withdrawals are open only from {WITHDRAW_WINDOW_LABEL} IST.
+                                        </span>
+                                    </p>
+                                )}
+
+                                {withdrawWindowOpen && profile.payout_upi && pendingCommission > 0 && (
+                                    <p className="mt-2 text-xs leading-relaxed text-amber-300/90">
+                                        Withdrawing stops your 5% bonus of ₹{pendingCommission.toFixed(2)} every 24 hours.
+                                    </p>
+                                )}
+
                                 {depositHoldActive && (
                                     <p className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-amber-300/90">
                                         <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
@@ -366,11 +392,13 @@ export default function AssetsPage() {
 
                             <button
                                 type="submit"
-                                disabled={isProcessing || depositHoldActive || withdrawalsLeft <= 0}
+                                disabled={isProcessing || !withdrawWindowOpen || depositHoldActive || withdrawalsLeft <= 0}
                                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500 to-purple-700 py-3.5 font-bold text-white shadow-[0_10px_30px_-8px_rgba(168,85,247,0.6)] transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
                             >
                                 {isProcessing ? (
                                     <>Processing...</>
+                                ) : !withdrawWindowOpen ? (
+                                    <>Opens {WITHDRAW_WINDOW_LABEL}</>
                                 ) : depositHoldActive ? (
                                     <>Withdrawal locked</>
                                 ) : withdrawalsLeft <= 0 ? (
