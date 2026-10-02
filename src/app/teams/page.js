@@ -183,12 +183,12 @@ export default function TeamsPage() {
                             {stats.team_count} / {stats.referral_limit} invited
                         </span>
                     </div>
-                    {stats.referral_slots_left === 0 && (
+                    {/* {stats.referral_slots_left === 0 && (
                         <p className="mb-3 rounded-lg border border-amber-400/25 bg-amber-500/10 p-2 text-xs text-amber-200/90">
                             You have reached the limit of {stats.referral_limit} referrals. New signups on your link will
                             not be linked to your team.
                         </p>
-                    )}
+                    )} */}
                     <div className="flex gap-2">
                         <div className="min-w-0 flex-1 truncate rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-[var(--text-muted)]">
                             {inviteLink || 'Loading...'}
