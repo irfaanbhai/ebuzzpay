@@ -42,9 +42,10 @@ export async function updateSession(request) {
         }
     )
 
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
+    // getClaims() verifies the JWT locally (no round trip to the auth server
+    // on every page change) and still refreshes an expired session
+    const { data } = await supabase.auth.getClaims()
+    const user = data?.claims?.sub
 
     if (!user) {
         // no user, redirect to login page

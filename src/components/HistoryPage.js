@@ -2,15 +2,41 @@
 
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, useRef } from 'react'
-import { ArrowLeft, Clock, CheckCircle, XCircle } from 'lucide-react'
+import { useEffect, useRef } from 'react'
+import { ArrowLeft } from 'lucide-react'
+import { useCachedQuery, useSessionUser } from '@/hooks/useCachedQuery'
+
+const FIVE_MINUTES = 5 * 60 * 1000
+
+// Label + colour for a row. Real withdrawal requests (no tool_id) show their
+// actual state; the simulated tool payouts keep the Paying / Expired display.
+const statusBadge = (txn) => {
+    if (txn.type === 'withdrawal' && !txn.tool_id) {
+        if (txn.status === 'approved') return ['Success', 'bg-emerald-500/15 text-emerald-300']
+        if (txn.status === 'rejected') return ['Rejected · refunded', 'bg-red-500/15 text-red-300']
+        if (txn.status === 'expired') return ['Expired', 'bg-red-500/15 text-red-300']
+        return ['Processing', 'bg-amber-500/15 text-amber-300']
+    }
+    if (txn.type === 'withdrawal') {
+        if (txn.status === 'approved') return ['Success', 'bg-emerald-500/15 text-emerald-300']
+        if (txn.status === 'rejected') return ['Expired', 'bg-red-500/15 text-red-300']
+        return new Date() - new Date(txn.created_at) > FIVE_MINUTES
+            ? ['Expired', 'bg-red-500/15 text-red-300']
+            : ['Paying', 'bg-amber-500/15 text-amber-300']
+    }
+    if (txn.status === 'approved') return ['Success', 'bg-emerald-500/15 text-emerald-300']
+    if (txn.status === 'rejected') return ['Rejected', 'bg-red-500/15 text-red-300']
+    if (txn.status === 'pending') return ['Pending', 'bg-amber-500/15 text-amber-300']
+    return [txn.status, 'bg-red-500/15 text-red-300']
+}
 
 export default function HistoryPage({ title, type }) {
-    const [transactions, setTransactions] = useState([])
-    const [loading, setLoading] = useState(true)
     const router = useRouter()
     const supabase = createClient()
     const simulationInterval = useRef(null)
+    const user = useSessionUser()
+    // Read once: the React Compiler would otherwise read user.id while user is still null
+    const userId = user?.id
 
     // Helper to generate fake transactions if conditions met
     const runSimulation = async (user_id) => {
@@ -82,50 +108,42 @@ export default function HistoryPage({ title, type }) {
         }
     }
 
-    const fetchHistory = async (uid) => {
-        let query = supabase
-            .from('transactions')
-            .select('*')
-            .eq('user_id', uid)
-            .order('created_at', { ascending: false })
+    const { data: transactions = [], loading, refresh } = useCachedQuery(
+        userId ? `history:${type || 'all'}:${userId}` : null,
+        async () => {
+            let query = supabase
+                .from('transactions')
+                .select('*')
+                .eq('user_id', userId)
+                .order('created_at', { ascending: false })
+                .limit(200)
 
-        if (type) {
-            query = query.eq('type', type)
+            if (type) {
+                query = query.eq('type', type)
+            }
+
+            const { data, error } = await query
+            if (error) throw error
+            return data
         }
+    )
 
-        const { data } = await query
-
-        if (data) setTransactions(data)
-        setLoading(false)
-    }
+    const fetchHistory = () => refresh()
 
     useEffect(() => {
+        if (!userId || type !== 'withdrawal') return
         let mounted = true
-        const init = async () => {
-            const { data: { user } } = await supabase.auth.getUser()
-            if (!user) {
-                router.push('/login')
-                return
-            }
 
-            if (mounted) fetchHistory(user.id)
-
-            // Start Simulation only for withdrawal history
-            if (type === 'withdrawal') {
-                simulationInterval.current = setInterval(() => {
-                    if (mounted) runSimulation(user.id)
-                }, 3000) // Check every 3 seconds
-            }
-        }
-        init()
+        // Start Simulation only for withdrawal history
+        simulationInterval.current = setInterval(() => {
+            if (mounted) runSimulation(userId)
+        }, 3000) // Check every 3 seconds
 
         return () => {
             mounted = false
             if (simulationInterval.current) clearInterval(simulationInterval.current)
         }
-
-
-    }, [router, supabase, type])
+    }, [userId, type])
 
     return (
         <div className="min-h-screen pb-8">
@@ -153,18 +171,8 @@ export default function HistoryPage({ title, type }) {
                                     <p className="text-lg font-bold text-white">
                                         ₹{txn.amount}
                                     </p>
-                                    <span className={`mt-1 inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold uppercase ${txn.type === 'withdrawal'
-                                        ? (txn.status === 'approved' ? 'bg-emerald-500/15 text-emerald-300'
-                                            : txn.status === 'rejected' ? 'bg-red-500/15 text-red-300'
-                                                : (new Date() - new Date(txn.created_at) > 5 * 60 * 1000 ? 'bg-red-500/15 text-red-300' : 'bg-amber-500/15 text-amber-300'))
-                                        : (txn.status === 'approved' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-red-500/15 text-red-300')
-                                        }`}>
-                                        {txn.type === 'withdrawal'
-                                            ? (txn.status === 'approved' ? 'Success'
-                                                : txn.status === 'rejected' ? 'Expired'
-                                                    : (new Date() - new Date(txn.created_at) > 5 * 60 * 1000 ? 'Expired' : 'Paying'))
-                                            : (txn.status === 'approved' ? 'Success' :
-                                                txn.status === 'rejected' ? 'Expired' : txn.status)}
+                                    <span className={`mt-1 inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold uppercase ${statusBadge(txn)[1]}`}>
+                                        {statusBadge(txn)[0]}
                                     </span>
                                 </div>
                                 <div className="text-right">

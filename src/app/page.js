@@ -6,22 +6,48 @@ import { useEffect, useState } from 'react'
 import { Headset, Megaphone, Wallet, Check } from 'lucide-react' // Icons
 import Image from 'next/image'
 import { useSlotCycle } from '@/hooks/useSlotCycle'
+import { useAdminSetting, useCachedQuery, useSessionUser } from '@/hooks/useCachedQuery'
 import SlotCountdown from '@/components/SlotCountdown'
 
-// Fixed INR slots, plus a custom amount from MIN_INR upwards
-const SLOT_AMOUNTS = [1000, 2000, 5000, 7000, 10000]
-const MIN_INR = 1000
+// Milestones on the Daily Total Recharge bar
+const MILESTONES = [1000, 2000, 5000, 7000, 10000]
+const MIN_INR = 500
+const MAX_SLOT_INR = 10000
 const BONUS_RATE = 0.05
 
+const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min
+
+// 8-10 slots: the first 3-4 between 500 and 1,500, the rest up to 10,000
+const generateSlots = () => {
+  const count = randInt(8, 10)
+  const lowCount = randInt(3, 4)
+  const pick = (n, min, max) => {
+    const values = new Set()
+    while (values.size < n) values.add(randInt(min, max))
+    return [...values].sort((a, b) => a - b)
+  }
+  return [...pick(lowCount, MIN_INR, 1500), ...pick(count - lowCount, 1501, MAX_SLOT_INR)]
+}
+
+// Shown on the first render (server and client must match), then replaced
+// by random amounts that change every 4-5 seconds
+const INITIAL_SLOTS = [525, 587, 670, 980, 1850, 3240, 5470, 7680, 9890]
+
 export default function Home() {
-  const [user, setUser] = useState(null)
-  const [balance, setBalance] = useState('0.00')
-  const [loading, setLoading] = useState(true)
-  const [telegramLink, setTelegramLink] = useState('https://t.me/ZPayService')
+  const user = useSessionUser()
+  // Read once: the React Compiler would otherwise read user.id while user is still null
+  const userId = user?.id
   const [customAmount, setCustomAmount] = useState('')
   const [customError, setCustomError] = useState('')
+  const [slots, setSlots] = useState(INITIAL_SLOTS)
   const router = useRouter()
-  const supabase = createClient()
+  const telegramLink = useAdminSetting('telegram_link', 'https://t.me/ZPayService')
+
+  const { data: balance } = useCachedQuery(userId ? `balance:${userId}` : null, async () => {
+    const { data, error } = await createClient().from('profiles').select('balance').eq('id', userId).single()
+    if (error) throw error
+    return data.balance
+  })
 
   // Same timer as the Assets page: stopped until a slot purchase, then
   // counts down to the next 5% payout, restarting after each one until the
@@ -29,38 +55,27 @@ export default function Home() {
   const { left: cycleLeft, total: todayRecharge } = useSlotCycle(user?.id)
 
   useEffect(() => {
-    const getUserData = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        setUser(user)
-        const { data } = await supabase.from('profiles').select('balance').eq('id', user.id).single()
-        if (data) setBalance(data.balance)
-      } else {
-        router.push('/login')
-      }
-      setLoading(false)
+    let timer
+    const shuffle = () => {
+      setSlots(generateSlots())
+      timer = setTimeout(shuffle, randInt(4000, 5000))
     }
-    getUserData()
-
-    const fetchTelegramLink = async () => {
-      const { data } = await supabase.rpc('get_admin_setting', { setting_key: 'telegram_link' })
-      if (data) setTelegramLink(data)
-    }
-    fetchTelegramLink()
-  }, [router, supabase])
+    timer = setTimeout(shuffle, randInt(4000, 5000))
+    return () => clearTimeout(timer)
+  }, [])
 
   // Milestones are evenly spaced on the bar, so the fill is interpolated
   // between the last reached dot and the next one rather than linearly.
-  const reachedCount = SLOT_AMOUNTS.filter((m) => todayRecharge >= m).length
-  const nextMilestone = SLOT_AMOUNTS[reachedCount] ?? null
+  const reachedCount = MILESTONES.filter((m) => todayRecharge >= m).length
+  const nextMilestone = MILESTONES[reachedCount] ?? null
 
   const progressPercent = (() => {
-    const last = SLOT_AMOUNTS.length - 1
+    const last = MILESTONES.length - 1
     if (reachedCount === 0) return 0
     if (reachedCount > last) return 100
 
-    const from = SLOT_AMOUNTS[reachedCount - 1]
-    const to = SLOT_AMOUNTS[reachedCount]
+    const from = MILESTONES[reachedCount - 1]
+    const to = MILESTONES[reachedCount]
     const within = (todayRecharge - from) / (to - from)
     return ((reachedCount - 1 + within) / last) * 100
   })()
@@ -80,8 +95,7 @@ export default function Home() {
   }
 
   const handleWithdrawClick = () => {
-    const balanceNum = parseFloat(balance)
-    if (balanceNum > 0) {
+    if (Number(balance) > 0) {
       router.push('/tool')
     } else {
       alert('Please topup first')
@@ -101,8 +115,6 @@ export default function Home() {
     setWithdrawalEnabled(newState)
     localStorage.setItem('withdrawalEnabled', JSON.stringify(newState))
   }
-
-  if (loading || !user) return null
 
   return (
     <div className="min-h-screen pb-28">
@@ -152,9 +164,9 @@ export default function Home() {
           </p>
 
           <div className="space-y-3">
-            {SLOT_AMOUNTS.map((amount) => (
+            {slots.map((amount, index) => (
               <div
-                key={amount}
+                key={index}
                 className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4"
               >
                 <div className="flex items-center gap-3">
@@ -162,11 +174,11 @@ export default function Home() {
                     ₹
                   </div>
                   <div>
-                    <p className="text-lg font-bold leading-tight text-white">
+                    <p key={amount} className="anim-fade text-lg font-bold leading-tight tabular-nums text-white">
                       ₹{amount.toLocaleString('en-IN')}
                     </p>
                     <p className="mt-0.5 text-xs text-[var(--text-dim)]">
-                      Income: ₹{(amount * BONUS_RATE).toLocaleString('en-IN')} every 24h
+                      Income: ₹{(amount * BONUS_RATE).toLocaleString('en-IN', { maximumFractionDigits: 2 })} every 24h
                     </p>
                   </div>
                 </div>
@@ -211,7 +223,7 @@ export default function Home() {
               <p className="mt-2 text-xs font-medium text-red-400">{customError}</p>
             ) : (
               <p className="mt-2 text-xs text-[var(--text-dim)]">
-                Minimum ₹{MIN_INR.toLocaleString('en-IN')} — no upper limit.
+                Minimum ₹{MIN_INR.toLocaleString('en-IN')} — no upper limit. INR deposits are locked for the first 24 hours only.
               </p>
             )}
           </div>
@@ -254,7 +266,7 @@ export default function Home() {
               />
             </div>
 
-            {SLOT_AMOUNTS.map((val) => {
+            {MILESTONES.map((val) => {
               const reached = todayRecharge >= val
               return (
                 <div
@@ -276,7 +288,7 @@ export default function Home() {
 
           {/* Labels share the dots' width so each sits centred under its dot */}
           <div className="mt-2 flex justify-between pb-1">
-            {SLOT_AMOUNTS.map((val) => (
+            {MILESTONES.map((val) => (
               <span
                 key={val}
                 className={`w-6 shrink-0 whitespace-nowrap text-center text-[10px] font-bold ${todayRecharge >= val ? 'text-emerald-300' : 'text-white/50'}`}

@@ -2,9 +2,12 @@
 
 import { createClient } from '@/utils/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useState, Suspense, useEffect } from 'react'
+import { useState, Suspense } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import { Copy, ChevronDown, ChevronRight, CheckCircle2, Lock } from 'lucide-react'
+import { Copy, ChevronDown, ChevronRight, CheckCircle2 } from 'lucide-react'
+import { useAdminSetting, useCachedQuery, useSessionUser } from '@/hooks/useCachedQuery'
+
+const MIN_INR = 500
 
 // Wrap logic in a separate component to use useSearchParams
 function PaymentProcess() {
@@ -16,37 +19,25 @@ function PaymentProcess() {
     const [loading, setLoading] = useState(false)
     const [submitted, setSubmitted] = useState(false)
     const supabase = createClient()
+    const user = useSessionUser()
+    // Read once: the React Compiler would otherwise read user.id while user is still null
+    const userId = user?.id
 
     // ADMIN UPI ID
-    const [adminUpi, setAdminUpi] = useState('mahawar-akash@ptyes') // Default fallback
+    const adminUpi = useAdminSetting('admin_upi', 'mahawar-akash@ptyes') // Default fallback
     const ADMIN_NAME = "Admin Merchant"
 
-    // Payer UPI: locked to the account after the first deposit
+    // Payer UPI: any UPI ID works; the ones used before are offered as shortcuts
     const [payerUpi, setPayerUpi] = useState('')
-    const [registeredUpi, setRegisteredUpi] = useState(null)
-
-    useEffect(() => {
-        const fetchUpi = async () => {
-            const { data } = await supabase.rpc('get_admin_setting', { setting_key: 'admin_upi' })
-            if (data) setAdminUpi(data)
-        }
-        fetchUpi()
-
-        const fetchPayerUpi = async () => {
-            const { data: { user } } = await supabase.auth.getUser()
-            if (!user) return
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('payout_upi')
-                .eq('id', user.id)
-                .single()
-            if (profile?.payout_upi) {
-                setRegisteredUpi(profile.payout_upi)
-                setPayerUpi(profile.payout_upi)
-            }
-        }
-        fetchPayerUpi()
-    }, [supabase])
+    const { data: savedUpis = [] } = useCachedQuery(userId ? `payout-upis:${userId}` : null, async () => {
+        const { data, error } = await supabase
+            .from('user_payout_upis')
+            .select('upi_id')
+            .eq('user_id', userId)
+            .order('created_at')
+        if (error) throw error
+        return data.map((row) => row.upi_id)
+    })
 
     const generateDeepLink = (app) => {
         const url = `upi://pay?pa=${adminUpi}&pn=${ADMIN_NAME}&am=${amount}&cu=INR`
@@ -70,18 +61,20 @@ function PaymentProcess() {
             return
         }
 
+        if (!(parseFloat(amount) >= MIN_INR)) {
+            alert(`Minimum deposit is ₹${MIN_INR}`)
+            return
+        }
+
         setLoading(true)
         try {
-            const { data: { user } } = await supabase.auth.getUser()
-
             if (!user) {
                 alert('Please login first')
                 router.push('/login')
                 return
             }
 
-            // Deposits are accepted only from the UPI ID registered on the
-            // account, and withdrawals are paid back to that same ID.
+            // Any UPI ID is accepted; it is also saved for withdrawals
             const { error } = await supabase.rpc('submit_upi_deposit', {
                 p_amount: parseFloat(amount),
                 p_utr: utr,
@@ -190,16 +183,26 @@ function PaymentProcess() {
                         type="text"
                         value={payerUpi}
                         onChange={(e) => setPayerUpi(e.target.value.toLowerCase().trim())}
-                        disabled={!!registeredUpi}
                         placeholder="e.g. 9876543210@paytm"
-                        className="flex-1 bg-transparent px-4 py-2 font-medium text-white outline-none disabled:text-white/60"
+                        className="flex-1 bg-transparent px-4 py-2 font-medium text-white outline-none"
                     />
-                    {registeredUpi && <Lock className="mr-3 h-4 w-4 shrink-0 self-center text-navy-300" />}
                 </div>
+                {savedUpis.length > 0 && (
+                    <div className="ml-1 mt-2 flex flex-wrap gap-2">
+                        {savedUpis.map((upi) => (
+                            <button
+                                key={upi}
+                                type="button"
+                                onClick={() => setPayerUpi(upi)}
+                                className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${payerUpi === upi ? 'border-navy-400 bg-navy-500/20 text-white' : 'border-white/10 bg-white/5 text-[var(--text-muted)] hover:text-white'}`}
+                            >
+                                {upi}
+                            </button>
+                        ))}
+                    </div>
+                )}
                 <p className="ml-1 mt-2 text-xs text-[var(--text-dim)]">
-                    {registeredUpi
-                        ? 'This UPI ID is locked to your account. Pay from this ID only — withdrawals are credited back to it.'
-                        : 'Deposits are accepted only from this UPI ID and withdrawals are paid back to it. It cannot be changed later.'}
+                    You can pay from any of your UPI IDs. Each ID you use is saved so you can pick it for withdrawals too.
                 </p>
             </div>
 

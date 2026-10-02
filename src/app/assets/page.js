@@ -2,9 +2,10 @@
 
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useState } from 'react'
-import { LogOut, History, Shield, Lock, RotateCw, ChevronRight, Wallet, Banknote, X, CheckCircle, FileText, Clock } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { LogOut, History, Shield, Lock, RotateCw, ChevronRight, Wallet, Banknote, X, CheckCircle, FileText, Clock, Plus, Trash2 } from 'lucide-react'
 import { useSlotCycle } from '@/hooks/useSlotCycle'
+import { clearQueryCache, useCachedQuery, useSessionUser } from '@/hooks/useCachedQuery'
 import SlotCountdown from '@/components/SlotCountdown'
 
 // Compact enough to stay on one line on a narrow phone
@@ -16,29 +17,32 @@ const formatNextCommission = (value) =>
         minute: '2-digit',
     })
 
-// Withdrawals are accepted 10:00 AM - 5:00 PM IST (server enforces it too)
-const WITHDRAW_OPEN_HOUR = 10
-const WITHDRAW_CLOSE_HOUR = 17
-const WITHDRAW_WINDOW_LABEL = '10:00 AM to 5:00 PM'
+const UPI_PATTERN = /^[a-z0-9._-]+@[a-z]+$/
 
-const isWithdrawWindowOpen = () => {
-    const hour = Number(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata', hour: 'numeric', hourCycle: 'h23' }))
-    return hour >= WITHDRAW_OPEN_HOUR && hour < WITHDRAW_CLOSE_HOUR
+const EMPTY_WALLET = {
+    balance: 0,
+    locked_balance: 0,
+    locked_until: null,
+    withdrawal_in_process: 0,
+    pending_commission: 0,
+    payout_upi: null,
+    payout_upis: [],
+    withdrawals_today: 0,
+    withdrawal_daily_limit: 3,
+    today_earnings: 0,
 }
 
 export default function AssetsPage() {
-    const [user, setUser] = useState(null)
-    const [profile, setProfile] = useState({ balance: 0.00, locked_balance: 0.00, payout_upi: null })
-    const [todayEarnings, setTodayEarnings] = useState(0.00)
-    const [pendingCommission, setPendingCommission] = useState(0.00)
-    const [withdrawUnlockAt, setWithdrawUnlockAt] = useState(null)
-    const [withdrawalsToday, setWithdrawalsToday] = useState(0)
-    const [withdrawalDailyLimit, setWithdrawalDailyLimit] = useState(3)
-    const [withdrawWindowOpen, setWithdrawWindowOpen] = useState(isWithdrawWindowOpen)
+    const user = useSessionUser()
+    // Read once: the React Compiler would otherwise read user.id while user is still null
+    const userId = user?.id
 
     // Withdrawal State
     const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false)
     const [withdrawalAmount, setWithdrawalAmount] = useState('')
+    const [selectedUpi, setSelectedUpi] = useState('')
+    const [newUpi, setNewUpi] = useState('')
+    const [isAddingUpi, setIsAddingUpi] = useState(false)
     const [isProcessing, setIsProcessing] = useState(false)
     const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false)
     const [error, setError] = useState('')
@@ -46,75 +50,87 @@ export default function AssetsPage() {
     const router = useRouter()
     const supabase = createClient()
 
-    const loadWallet = useCallback(async (userId) => {
-        // Settles any slot commission that has passed its 24h wait
-        // and returns the up-to-date wallet figures.
-        const { data: summary } = await supabase.rpc('get_wallet_summary')
-        if (summary) {
-            setProfile((prev) => ({
-                ...prev,
-                balance: Number(summary.balance || 0),
-                locked_balance: Number(summary.locked_balance || 0),
-                payout_upi: summary.payout_upi
-            }))
-            setPendingCommission(Number(summary.pending_commission || 0))
-            setWithdrawUnlockAt(summary.withdraw_unlock_at || null)
-            setWithdrawalsToday(Number(summary.withdrawals_today || 0))
-            if (summary.withdrawal_daily_limit) setWithdrawalDailyLimit(Number(summary.withdrawal_daily_limit))
-            setWithdrawWindowOpen(isWithdrawWindowOpen())
+    // Settles any slot commission that is due and returns every wallet
+    // figure for this screen in one call
+    const { data: wallet, loading: walletLoading, refresh: refreshWallet, mutate: mutateWallet } = useCachedQuery(
+        userId ? `wallet:${userId}` : null,
+        async () => {
+            const { data, error } = await supabase.rpc('get_wallet_summary')
+            if (error) throw error
+            return data
         }
-
-        // Fetch Today's Earnings
-        const { data: earnings } = await supabase.rpc('get_today_earnings', { target_user_id: userId })
-        if (earnings !== null) setTodayEarnings(earnings)
-    }, [supabase])
-
-    useEffect(() => {
-        const getData = async () => {
-            const { data: { user } } = await supabase.auth.getUser()
-            if (user) {
-                setUser(user)
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', user.id)
-                    .single()
-
-                if (profile) setProfile(profile)
-
-                await loadWallet(user.id)
-            } else {
-                router.push('/login')
-            }
-        }
-        getData()
-    }, [router, supabase, loadWallet])
+    )
 
     // Same timer as the Home page. When it hits zero, re-read the wallet so
     // the server credits the matured commission and the figures refresh.
-    const { left: bonusLeft } = useSlotCycle(user?.id, () => {
-        if (user) loadWallet(user.id)
-    })
+    const { left: bonusLeft, refresh: refreshCycle } = useSlotCycle(user?.id, refreshWallet)
 
     // Coming back to the tab refreshes the wallet figures too
     useEffect(() => {
-        if (!user) return
         const onVisible = () => {
-            if (document.visibilityState === 'visible') loadWallet(user.id)
+            if (document.visibilityState === 'visible') refreshWallet()
         }
         document.addEventListener('visibilitychange', onVisible)
         return () => document.removeEventListener('visibilitychange', onVisible)
-    }, [user, loadWallet])
+    }, [refreshWallet])
 
     const handleSignOut = async () => {
         await supabase.auth.signOut()
+        clearQueryCache()
         router.push('/login')
     }
 
-    const lockedBalance = Number(profile.locked_balance || 0)
-    const withdrawableBalance = Math.max(0, Number(profile.balance || 0) - lockedBalance)
-    const withdrawalsLeft = Math.max(0, withdrawalDailyLimit - withdrawalsToday)
-    const depositHoldActive = withdrawUnlockAt && new Date(withdrawUnlockAt).getTime() > Date.now()
+    const w = wallet || EMPTY_WALLET
+    const balance = Number(w.balance || 0)
+    const lockedBalance = Number(w.locked_balance || 0)
+    const withdrawableBalance = Math.max(0, balance - lockedBalance)
+    const inProcess = Number(w.withdrawal_in_process || 0)
+    const pendingCommission = Number(w.pending_commission || 0)
+    const todayEarnings = Number(w.today_earnings || 0)
+    const withdrawalDailyLimit = Number(w.withdrawal_daily_limit || 3)
+    const withdrawalsLeft = Math.max(0, withdrawalDailyLimit - Number(w.withdrawals_today || 0))
+    const savedUpis = Array.isArray(w.payout_upis) ? w.payout_upis : []
+
+    const openWithdrawModal = () => {
+        setError('')
+        setNewUpi('')
+        setIsAddingUpi(savedUpis.length === 0)
+        setSelectedUpi(savedUpis.includes(w.payout_upi) ? w.payout_upi : (savedUpis[0] || ''))
+        setIsWithdrawModalOpen(true)
+        refreshWallet()
+    }
+
+    const saveUpi = async () => {
+        const upi = newUpi.trim().toLowerCase()
+        if (!UPI_PATTERN.test(upi)) {
+            setError('Invalid UPI ID format. Example: 9876543210@paytm')
+            return
+        }
+        setError('')
+        if (!savedUpis.includes(upi)) {
+            const { error: insertError } = await supabase.from('user_payout_upis').insert({ user_id: userId, upi_id: upi })
+            if (insertError && insertError.code !== '23505') {
+                setError(insertError.message)
+                return
+            }
+            mutateWallet((prev) => ({ ...(prev || EMPTY_WALLET), payout_upis: [...savedUpis, upi] }))
+        }
+        setSelectedUpi(upi)
+        setNewUpi('')
+        setIsAddingUpi(false)
+    }
+
+    const removeUpi = async (upi) => {
+        const { error: deleteError } = await supabase.from('user_payout_upis').delete().eq('user_id', userId).eq('upi_id', upi)
+        if (deleteError) {
+            setError(deleteError.message)
+            return
+        }
+        const rest = savedUpis.filter((u) => u !== upi)
+        mutateWallet((prev) => ({ ...(prev || EMPTY_WALLET), payout_upis: rest }))
+        if (selectedUpi === upi) setSelectedUpi(rest[0] || '')
+        if (rest.length === 0) setIsAddingUpi(true)
+    }
 
     const handleWithdrawal = async (e) => {
         e.preventDefault()
@@ -123,49 +139,38 @@ export default function AssetsPage() {
 
         try {
             const amount = parseFloat(withdrawalAmount)
+            // A UPI typed in but not saved yet is used as well
+            const upi = (isAddingUpi && newUpi.trim() ? newUpi : selectedUpi).trim().toLowerCase()
+
             if (isNaN(amount) || amount <= 0) {
                 throw new Error('Please enter a valid amount')
             }
-            if (amount > profile.balance) {
+            if (amount > balance) {
                 throw new Error('Insufficient balance')
             }
-            if (!profile.payout_upi) {
-                throw new Error('Buy a slot first. Withdrawals are paid only to the UPI ID you deposited from.')
+            if (!upi) {
+                throw new Error('Please add or select the UPI ID to receive the money.')
             }
-            if (!isWithdrawWindowOpen()) {
-                setWithdrawWindowOpen(false)
-                throw new Error(`Withdrawals are open only from ${WITHDRAW_WINDOW_LABEL} IST.`)
-            }
-            if (depositHoldActive) {
-                throw new Error(`You can withdraw 24 hours after your last deposit. Withdrawal opens at ${formatNextCommission(withdrawUnlockAt)}.`)
+            if (!UPI_PATTERN.test(upi)) {
+                throw new Error('Invalid UPI ID format. Example: 9876543210@paytm')
             }
             if (withdrawalsLeft <= 0) {
                 throw new Error(`You can make only ${withdrawalDailyLimit} withdrawals per day. Try again tomorrow.`)
             }
             if (amount > withdrawableBalance) {
-                throw new Error(`₹${lockedBalance.toFixed(2)} of your balance has not been used on a slot yet. Put it on a slot before withdrawing.`)
+                throw new Error(`₹${lockedBalance.toFixed(2)} from your INR deposit is locked for its first 24 hours${w.locked_until ? ` (unlocks ${formatNextCommission(w.locked_until)})` : ''}. You can withdraw up to ₹${withdrawableBalance.toFixed(2)} now.`)
             }
 
-            // Server re-checks the time window, deposit hold, daily limit, locked balance and UPI ID
-            const { error: txError } = await supabase.rpc('request_withdrawal', { p_amount: amount })
-
+            // Server re-checks the time window, daily limit, INR lock and UPI ID,
+            // and takes the amount out of the wallet until the admin decides
+            const { error: txError } = await supabase.rpc('request_withdrawal', { p_amount: amount, p_upi_id: upi })
             if (txError) throw txError
 
-            // Determine if we need to deduct locally for immediate UI update (optional, relying on re-fetch is safer usually but user wants generic "processing" msg)
-            // For now, just show the success message
             setIsWithdrawModalOpen(false)
             setIsSuccessModalOpen(true)
             setWithdrawalAmount('')
-
-            // Refresh profile to show updated balance if backend trigger/logic runs immediately (unlikely if pending)
-            const { data: updatedProfile } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', user.id)
-                .single()
-            if (updatedProfile) setProfile(updatedProfile)
-            await loadWallet(user.id)
-
+            refreshWallet()
+            refreshCycle()
         } catch (err) {
             setError(err.message)
         } finally {
@@ -175,7 +180,7 @@ export default function AssetsPage() {
 
     const menuItems = [
         { name: 'Deposit', icon: Wallet, color: 'text-navy-300', action: () => router.push('/deposit') },
-        { name: 'Withdrawal', icon: Banknote, color: 'text-purple-400', action: () => { setError(''); setIsWithdrawModalOpen(true); loadWallet(user.id) } },
+        { name: 'Withdrawal', icon: Banknote, color: 'text-purple-400', action: openWithdrawModal },
         { name: 'Quota History', icon: History, color: 'text-[var(--text-muted)]', action: () => router.push('/history/quota') },
         { name: 'Deposit History', icon: RotateCw, color: 'text-emerald-400', action: () => router.push('/history/deposit') },
         { name: 'Withdrawal History', icon: RotateCw, color: 'text-red-400', action: () => router.push('/history/withdrawal') },
@@ -186,8 +191,6 @@ export default function AssetsPage() {
         { name: 'Version Update', icon: RotateCw, color: 'text-navy-400', action: () => alert('Latest Version: 1.0.2') },
     ]
 
-    if (!user) return null
-
     return (
         <div className="relative min-h-screen pb-28">
             {/* Header */}
@@ -197,11 +200,11 @@ export default function AssetsPage() {
 
                 <div className="relative z-10 mx-auto flex max-w-2xl items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur-sm sm:gap-4 sm:p-4">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-white/20 bg-gradient-to-br from-navy-300 to-navy-600 text-base font-bold text-white sm:h-12 sm:w-12 sm:text-xl">
-                        {user.email ? user.email[0].toUpperCase() : 'U'}
+                        {user?.email ? user.email[0].toUpperCase() : 'U'}
                     </div>
                     <div className="min-w-0 flex-1 text-left">
-                        <p className="truncate text-sm font-medium sm:text-base">{user.email}</p>
-                        <p className="truncate text-xs text-navy-50/60 sm:text-sm">ID: {user.id.slice(0, 8)}</p>
+                        <p className="truncate text-sm font-medium sm:text-base">{user?.email || '\u00a0'}</p>
+                        <p className="truncate text-xs text-navy-50/60 sm:text-sm">ID: {user ? user.id.slice(0, 8) : '—'}</p>
                     </div>
                     <div className="shrink-0 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-bold leading-tight text-navy-700 shadow-sm sm:px-3 sm:text-xs">
                         Reward Ratio: 3
@@ -218,14 +221,14 @@ export default function AssetsPage() {
                     <div className="relative z-10 min-w-0 border-r border-white/10 pr-3 sm:pr-6">
                         <p className="flex items-baseline text-2xl font-bold tabular-nums sm:text-3xl">
                             <span className="mr-0.5 shrink-0 text-base sm:mr-1 sm:text-lg">₹</span>
-                            <span className="truncate">{profile.balance.toFixed(2)}</span>
+                            <span className={`truncate ${walletLoading ? 'animate-pulse text-white/40' : ''}`}>{balance.toFixed(2)}</span>
                         </p>
                         <p className="mt-1 text-[10px] uppercase leading-tight tracking-wide text-[var(--text-muted)] sm:text-xs">Wallet Balance</p>
                     </div>
                     <div className="relative z-10 min-w-0 pl-3 sm:pl-6">
                         <p className="flex items-baseline text-2xl font-bold tabular-nums text-emerald-400 sm:text-3xl">
                             <span className="mr-0.5 shrink-0 text-base sm:mr-1 sm:text-lg">₹</span>
-                            <span className="truncate">{todayEarnings.toFixed(2)}</span>
+                            <span className={`truncate ${walletLoading ? 'animate-pulse text-emerald-400/40' : ''}`}>{todayEarnings.toFixed(2)}</span>
                         </p>
                         <p className="mt-1 text-[10px] uppercase leading-tight tracking-wide text-[var(--text-muted)] sm:text-xs">Today&apos;s Earning</p>
                     </div>
@@ -253,8 +256,17 @@ export default function AssetsPage() {
 
                 {lockedBalance > 0 && (
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl border border-amber-400/25 bg-amber-500/10 px-3 py-3 text-xs sm:px-4">
-                        <span className="min-w-0 text-amber-200/90">Locked until put on a slot</span>
+                        <span className="min-w-0 text-amber-200/90">
+                            INR deposit locked for 24h{w.locked_until ? ` · unlocks ${formatNextCommission(w.locked_until)}` : ''}
+                        </span>
                         <span className="shrink-0 font-bold tabular-nums text-amber-300">₹{lockedBalance.toFixed(2)}</span>
+                    </div>
+                )}
+
+                {inProcess > 0 && (
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl border border-purple-400/25 bg-purple-500/10 px-3 py-3 text-xs sm:px-4">
+                        <span className="min-w-0 text-purple-200/90">Withdrawal in process</span>
+                        <span className="shrink-0 font-bold tabular-nums text-purple-300">₹{inProcess.toFixed(2)}</span>
                     </div>
                 )}
 
@@ -330,10 +342,10 @@ export default function AssetsPage() {
                                 <div className="mt-3 space-y-1.5 rounded-lg border border-white/10 bg-white/5 p-3 text-xs">
                                     <div className="flex justify-between gap-2 text-[var(--text-muted)]">
                                         <span className="min-w-0">Wallet Balance</span>
-                                        <span className="shrink-0 font-bold tabular-nums text-white">₹{Number(profile.balance || 0).toFixed(2)}</span>
+                                        <span className="shrink-0 font-bold tabular-nums text-white">₹{balance.toFixed(2)}</span>
                                     </div>
                                     <div className="flex justify-between gap-2 text-[var(--text-muted)]">
-                                        <span className="min-w-0">Locked (not on a slot yet)</span>
+                                        <span className="min-w-0">Locked (INR deposit, first 24h)</span>
                                         <span className="shrink-0 font-bold tabular-nums text-amber-400">₹{lockedBalance.toFixed(2)}</span>
                                     </div>
                                     <div className="flex justify-between gap-2 border-t border-white/10 pt-1.5 text-[var(--text-muted)]">
@@ -344,43 +356,89 @@ export default function AssetsPage() {
                                         <span className="min-w-0">Withdrawals left today</span>
                                         <span className={`shrink-0 font-bold tabular-nums ${withdrawalsLeft > 0 ? 'text-white' : 'text-red-400'}`}>{withdrawalsLeft} / {withdrawalDailyLimit}</span>
                                     </div>
-                                    <div className="flex justify-between gap-2 border-t border-white/10 pt-1.5 text-[var(--text-muted)]">
-                                        <span className="shrink-0">Payout UPI</span>
-                                        <span className="min-w-0 truncate font-bold text-white">{profile.payout_upi || 'Not set'}</span>
+                                </div>
+
+                                {/* Payout UPI: any saved ID, or add a new one */}
+                                <div className="mt-4">
+                                    <label className="mb-2 block text-sm font-medium text-[var(--text-muted)]">Receive on UPI ID</label>
+                                    <div className="space-y-2">
+                                        {savedUpis.map((upi) => (
+                                            <div
+                                                key={upi}
+                                                className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm transition-colors ${selectedUpi === upi && !isAddingUpi ? 'border-purple-400/60 bg-purple-500/15' : 'border-white/10 bg-white/5'}`}
+                                            >
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setSelectedUpi(upi); setIsAddingUpi(false) }}
+                                                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                                                >
+                                                    <span className={`h-3.5 w-3.5 shrink-0 rounded-full border-2 ${selectedUpi === upi && !isAddingUpi ? 'border-purple-300 bg-purple-400' : 'border-white/30'}`} />
+                                                    <span className="min-w-0 truncate font-semibold text-white">{upi}</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeUpi(upi)}
+                                                    aria-label={`Remove ${upi}`}
+                                                    className="shrink-0 text-[var(--text-dim)] hover:text-red-400"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                        ))}
+
+                                        {isAddingUpi ? (
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={newUpi}
+                                                    onChange={(e) => setNewUpi(e.target.value.toLowerCase().trim())}
+                                                    placeholder="e.g. 9876543210@paytm"
+                                                    className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-medium text-white focus:border-navy-400 focus:outline-none focus:ring-2 focus:ring-navy-500/30"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={saveUpi}
+                                                    disabled={!newUpi}
+                                                    className="btn-navy shrink-0 rounded-xl px-4 text-xs font-bold disabled:opacity-60"
+                                                >
+                                                    Save
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsAddingUpi(true)}
+                                                className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-white/20 py-2.5 text-xs font-bold text-navy-300 hover:bg-white/5"
+                                            >
+                                                <Plus className="h-4 w-4" /> Add another UPI ID
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
 
-                                {!withdrawWindowOpen && (
+                                <p className="mt-3 text-xs leading-relaxed text-[var(--text-dim)]">
+                                    Maximum {withdrawalDailyLimit} withdrawal requests per day. Rejected requests also count.
+                                </p>
+
+                                {lockedBalance > 0 && (
                                     <p className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-amber-300/90">
-                                        <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                        <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                                         <span className="min-w-0">
-                                            Withdrawals are open only from {WITHDRAW_WINDOW_LABEL} IST.
+                                            ₹{lockedBalance.toFixed(2)} from your INR deposit is locked for its first 24 hours
+                                            {w.locked_until ? ` and unlocks at ${formatNextCommission(w.locked_until)}` : ''}. USDT deposits are never locked.
                                         </span>
                                     </p>
                                 )}
 
-                                {withdrawWindowOpen && profile.payout_upi && pendingCommission > 0 && (
+                                {pendingCommission > 0 && (
                                     <p className="mt-2 text-xs leading-relaxed text-amber-300/90">
                                         Withdrawing stops your 5% bonus of ₹{pendingCommission.toFixed(2)} every 24 hours.
                                     </p>
                                 )}
 
-                                {depositHoldActive && (
-                                    <p className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-amber-300/90">
-                                        <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                                        <span className="min-w-0">
-                                            Withdrawal opens 24 hours after your last deposit, at {formatNextCommission(withdrawUnlockAt)}.
-                                            A new deposit restarts the 24 hours.
-                                        </span>
-                                    </p>
-                                )}
-
-                                {lockedBalance > 0 && (
-                                    <p className="mt-2 text-xs leading-relaxed text-amber-300/90">
-                                        ₹{lockedBalance.toFixed(2)} was credited to you without a slot purchase. Buy a slot of that
-                                        amount to unlock it for withdrawal.
-                                    </p>
-                                )}
+                                <p className="mt-2 text-xs leading-relaxed text-[var(--text-dim)]">
+                                    The amount leaves your wallet when you submit. If the request is rejected, it is returned to your wallet.
+                                </p>
                             </div>
 
                             {error && (
@@ -392,15 +450,11 @@ export default function AssetsPage() {
 
                             <button
                                 type="submit"
-                                disabled={isProcessing || !withdrawWindowOpen || depositHoldActive || withdrawalsLeft <= 0}
+                                disabled={isProcessing || withdrawalsLeft <= 0}
                                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500 to-purple-700 py-3.5 font-bold text-white shadow-[0_10px_30px_-8px_rgba(168,85,247,0.6)] transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
                             >
                                 {isProcessing ? (
                                     <>Processing...</>
-                                ) : !withdrawWindowOpen ? (
-                                    <>Opens {WITHDRAW_WINDOW_LABEL}</>
-                                ) : depositHoldActive ? (
-                                    <>Withdrawal locked</>
                                 ) : withdrawalsLeft <= 0 ? (
                                     <>Daily limit reached</>
                                 ) : (
@@ -429,7 +483,7 @@ export default function AssetsPage() {
 
                         <h2 className="mb-2 text-xl font-bold text-white sm:text-2xl">Success!</h2>
                         <p className="mb-6 text-sm leading-relaxed text-[var(--text-muted)] sm:mb-8 sm:text-base">
-                            Your withdrawal request is in processing and will be completed within 24 hours.
+                            Your withdrawal request is in processing and will be completed within 24 hours. The amount is held from your wallet and returned if the request is rejected.
                         </p>
 
                         <button

@@ -4,17 +4,35 @@ import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 
+// Admin, login and the status pages are always reachable
+const isExempt = (pathname) =>
+    pathname.startsWith('/admin') ||
+    pathname.startsWith('/login') ||
+    pathname === '/register' ||
+    pathname === '/maintenance' ||
+    pathname === '/banned'
+
 export default function MaintenanceGuard({ children }) {
     const [maintenanceMode, setMaintenanceMode] = useState(false)
+    const [isBanned, setIsBanned] = useState(false)
     const [isLoading, setIsLoading] = useState(true)
     const pathname = usePathname()
     const router = useRouter()
-    const supabase = createClient()
 
+    // Maintenance flag: read once, then follow it in realtime
     useEffect(() => {
-        checkMaintenance()
+        const supabase = createClient()
 
-        // Subscribe to changes in admin_settings
+        supabase
+            .from('admin_settings')
+            .select('value')
+            .eq('key', 'maintenance_mode')
+            .single()
+            .then(({ data }) => {
+                if (data) setMaintenanceMode(data.value === 'true')
+            })
+            .finally(() => setIsLoading(false))
+
         const channel = supabase
             .channel('maintenance_check')
             .on(
@@ -33,81 +51,52 @@ export default function MaintenanceGuard({ children }) {
         }
     }, [])
 
+    // Ban status: checked once per sign-in instead of on every page change,
+    // so moving between pages doesn't wait on two extra requests
     useEffect(() => {
-        const checkRedirect = async () => {
-            // Allow admin, login, and maintenance page always
-            if (pathname.startsWith('/admin') || pathname.startsWith('/login') || pathname === '/maintenance' || pathname === '/banned') {
+        const supabase = createClient()
+        let ignore = false
+
+        const checkBan = async (userId) => {
+            if (!userId) {
+                setIsBanned(false)
                 return
             }
-
-            // BAN CHECK
-            const { data: { user } } = await supabase.auth.getUser()
-            if (user) {
-                // We need to check profile.is_banned
-                // Ideally this should be a subscription or real-time, but fetch on nav is okay for now.
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('is_banned')
-                    .eq('id', user.id)
-                    .single()
-
-                if (profile?.is_banned) {
-                    // Redirect to banned page or show alert?
-                    // Let's redirect to a simple '/banned' route or just force logout logic?
-                    // User asked "they will marker banned".
-                    // Let's redirect to '/banned'
-                    if (pathname !== '/banned') {
-                        router.push('/banned')
-                    }
-                    return
-                }
-            } else {
-                // Not logged in, no ban check needed
-            }
-
-            if (maintenanceMode) {
-                // Check if user is admin
-                // The requirement is "set this website under maintenance".
-                // Admin needs to access Admin Panel. Everyone else gets blocked.
-                // The Admin Panel is at /admin.
-                // So if pathname starts with /admin, we allow.
-                // If maintenance is ON and user is NOT on /admin (and not /maintenance), redirect.
-
-                // Wait, we need to allow LOGIN for Admin to get to Admin Panel? 
-                // Yes, /login should be allowed.
-                router.push('/maintenance')
-            } else if (pathname === '/maintenance') {
-                // If maintenance is OFF, kick them out of maintenance page
-                router.push('/')
-            }
-        }
-
-        if (!isLoading) {
-            checkRedirect()
-        }
-    }, [maintenanceMode, pathname, isLoading])
-
-
-    const checkMaintenance = async () => {
-        try {
-            const { data, error } = await supabase
-                .from('admin_settings')
-                .select('value')
-                .eq('key', 'maintenance_mode')
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('is_banned')
+                .eq('id', userId)
                 .single()
-
-            if (data) {
-                setMaintenanceMode(data.value === 'true')
-            }
-        } catch (error) {
-            console.error('Error checking maintenance:', error)
-        } finally {
-            setIsLoading(false)
+            if (!ignore) setIsBanned(Boolean(profile?.is_banned))
         }
-    }
 
-    // Don't block rendering while loading, just check in background/effect. 
-    // Or do we want to BLOCK? Better to not block to avoid flicker, but might show content briefly.
-    // Let's show children but redirect quickly.
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+                checkBan(session?.user?.id)
+            }
+        })
+
+        return () => {
+            ignore = true
+            subscription.unsubscribe()
+        }
+    }, [])
+
+    useEffect(() => {
+        if (isLoading || !pathname) return
+
+        if (isExempt(pathname)) {
+            // If maintenance is OFF, kick them out of maintenance page
+            if (pathname === '/maintenance' && !maintenanceMode) router.push('/')
+            return
+        }
+
+        if (isBanned) {
+            router.push('/banned')
+        } else if (maintenanceMode) {
+            router.push('/maintenance')
+        }
+    }, [maintenanceMode, isBanned, pathname, isLoading, router])
+
     return children
 }

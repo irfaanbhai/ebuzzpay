@@ -1,9 +1,8 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
 import { ArrowLeft, Send, MessageCircle, FileText } from 'lucide-react'
-import { createClient } from '@/utils/supabase/client'
+import { useAdminSetting } from '@/hooks/useCachedQuery'
 
 const DEFAULT_TELEGRAM_LINK = 'https://t.me/ZPayService'
 
@@ -16,20 +15,8 @@ const buildWhatsappLink = (number) => {
 
 export default function SupportPage() {
     const router = useRouter()
-    const supabase = createClient()
-    const [telegramLink, setTelegramLink] = useState(DEFAULT_TELEGRAM_LINK)
-    const [whatsappNumber, setWhatsappNumber] = useState('')
-
-    useEffect(() => {
-        const fetchContacts = async () => {
-            const { data: tg } = await supabase.rpc('get_admin_setting', { setting_key: 'telegram_link' })
-            if (tg) setTelegramLink(tg)
-
-            const { data: wa } = await supabase.rpc('get_admin_setting', { setting_key: 'whatsapp_number' })
-            if (wa) setWhatsappNumber(wa)
-        }
-        fetchContacts()
-    }, [supabase])
+    const telegramLink = useAdminSetting('telegram_link', DEFAULT_TELEGRAM_LINK)
+    const whatsappNumber = useAdminSetting('whatsapp_number', '')
 
     const whatsappLink = buildWhatsappLink(whatsappNumber)
 

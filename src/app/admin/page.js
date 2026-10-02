@@ -570,7 +570,7 @@ export default function AdminPage() {
                                                     <p className="font-bold text-navy-300">₹ {user.balance}</p>
                                                 </div>
                                                 <div>
-                                                    <p className="text-[10px] font-bold uppercase text-[var(--text-dim)]">Locked</p>
+                                                    <p className="text-[10px] font-bold uppercase text-[var(--text-dim)]">Locked (INR 24h)</p>
                                                     <p className="font-bold text-amber-400">₹ {user.locked_balance || 0}</p>
                                                 </div>
                                                 <div>
@@ -829,7 +829,7 @@ export default function AdminPage() {
                                         />
                                         <p className="mt-1 text-xs text-[var(--text-dim)]">
                                             Paid on top of the converted value (e.g. 3 means 100 USDT earns ₹300 bonus).
-                                            The bonus is credited as locked balance.
+                                            USDT deposits and their bonus are never locked.
                                         </p>
                                     </div>
                                     <button

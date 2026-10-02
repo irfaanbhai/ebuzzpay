@@ -1,9 +1,15 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import { QRCodeCanvas } from 'qrcode.react'
+import { useAdminSetting, useSessionUser } from '@/hooks/useCachedQuery'
+
+const toNumber = (value, fallback) => {
+    const n = parseFloat(value)
+    return isNaN(n) ? fallback : n
+}
 
 // Minimum deposit, and the default INR bonus paid per 1 USDT.
 // Both the rate and the bonus are overridable from the admin Settings tab.
@@ -13,9 +19,12 @@ const DEFAULT_BONUS_PER_USDT = 3
 
 export default function DepositPage() {
     const router = useRouter()
+    const user = useSessionUser()
+    // Read once: the React Compiler would otherwise read user.id while user is still null
+    const userId = user?.id
 
-    const [rate, setRate] = useState(DEFAULT_RATE)
-    const [bonusPerUsdt, setBonusPerUsdt] = useState(DEFAULT_BONUS_PER_USDT)
+    const rate = toNumber(useAdminSetting('usdt_rate', null), DEFAULT_RATE)
+    const bonusPerUsdt = toNumber(useAdminSetting('usdt_bonus_per_unit', null), DEFAULT_BONUS_PER_USDT)
 
     const [usdtAmount, setUsdtAmount] = useState('')
     const [amountError, setAmountError] = useState('')
@@ -29,19 +38,6 @@ export default function DepositPage() {
     // Admin addresses (Placeholders as requested)
     const TRC20_ADDRESS = "TR3aSADssGoD682MvUC5vgZeaX2qWnkWkD"
     const BEP20_ADDRESS = "0x31A1F4c298dc3F1024107e2868bA0fE4AEcCAaF5"
-
-    useEffect(() => {
-        const fetchSettings = async () => {
-            const supabase = createClient()
-
-            const { data: rateValue } = await supabase.rpc('get_admin_setting', { setting_key: 'usdt_rate' })
-            if (rateValue && !isNaN(parseFloat(rateValue))) setRate(parseFloat(rateValue))
-
-            const { data: bonusValue } = await supabase.rpc('get_admin_setting', { setting_key: 'usdt_bonus_per_unit' })
-            if (bonusValue && !isNaN(parseFloat(bonusValue))) setBonusPerUsdt(parseFloat(bonusValue))
-        }
-        fetchSettings()
-    }, [])
 
     // 1 USDT -> `rate` INR, plus a flat `bonusPerUsdt` INR bonus for every USDT
     const usdtNum = parseFloat(usdtAmount) || 0
@@ -73,13 +69,10 @@ export default function DepositPage() {
 
         setIsSubmitting(true)
         try {
-            const supabase = createClient()
-
-            const { data: { user } } = await supabase.auth.getUser()
             if (!user) return router.push('/login')
 
-            const { error } = await supabase.from('transactions').insert({
-                user_id: user.id,
+            const { error } = await createClient().from('transactions').insert({
+                user_id: userId,
                 // `amount` is the paid-for INR value; the bonus is tracked
                 // separately so it can be credited as locked money.
                 amount: parseFloat(inrValue.toFixed(2)),
@@ -177,7 +170,7 @@ export default function DepositPage() {
                             <p>* Each address is valid for 30 minutes, please do not save this address</p>
                             <p>* After the recharge is completed, please wait for 3-5 minutes for the deposit to arrive</p>
                             <p className="text-[var(--text-dim)]">
-                                * The bonus is credited as locked balance — put it on a slot to make it withdrawable.
+                                * USDT deposits and their bonus are never locked — they can be withdrawn any time in the withdrawal window.
                             </p>
                         </div>
 

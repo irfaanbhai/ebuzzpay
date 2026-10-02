@@ -24,9 +24,8 @@ const SECTIONS = [
     {
         title: '3. Deposits (Buying a Slot)',
         points: [
-            'The minimum INR slot is ₹1,000. The minimum USDT deposit is 10 USDT.',
-            'Deposits are accepted ONLY from the UPI ID registered on your account. The first UPI ID you deposit from is locked to your account permanently.',
-            'Payments sent from any other UPI ID or bank account will not be credited and may be forfeited.',
+            'The minimum INR slot is ₹500. The minimum USDT deposit is 10 USDT.',
+            'You can deposit from any of your own UPI IDs. Enter the UPI ID you actually paid from — every ID you use is saved to your account.',
             'A valid UTR / reference number must be submitted for every payment. Deposits without a correct UTR will not be approved.',
             'The same UTR cannot be submitted twice.',
             'Deposits are credited only after admin verification. Verification may take time during heavy load.',
@@ -35,10 +34,10 @@ const SECTIONS = [
     {
         title: '4. Withdrawals',
         points: [
-            'Any amount credited to your wallet without a slot purchase — the 5% slot commission, referral bonus, promotional credit, or an amount added by the admin — is LOCKED.',
-            'Locked amounts cannot be withdrawn. You must put that amount on a slot before it becomes withdrawable.',
-            'Withdrawable balance = Wallet Balance − Locked Balance.',
-            'Withdrawals are paid out ONLY to the same UPI ID and account you deposited from. Payout to a third-party account is not possible.',
+            'An INR deposit is locked for the first 24 hours after it is approved. After that, your whole balance is withdrawable. USDT deposits are never locked.',
+            'Withdrawals can be requested at any time, with a maximum of 3 withdrawal requests per day. Rejected requests also count towards the 3.',
+            'You can save several UPI IDs and choose any of them for each withdrawal. The UPI IDs must belong to you.',
+            'The requested amount is taken from your wallet when you submit the request. If the request is rejected, the amount is returned to your wallet.',
             'Withdrawal requests are processed after admin approval, normally within 24 hours.',
             'A withdrawal request may be rejected if the account shows suspicious activity, mismatched payment details, or a violation of these terms.',
         ],
@@ -56,8 +55,8 @@ const SECTIONS = [
         title: '6. Slot Commission (5%)',
         points: [
             'Every approved slot purchase earns a 5% commission.',
-            'The commission is NOT credited immediately. It is credited to your wallet 24 hours after the slot purchase is approved.',
-            'The commission is credited as locked money. You must put that amount on a slot before it can be withdrawn.',
+            'The commission is credited to your wallet every 24 hours after the slot purchase is approved, for as long as you do not withdraw.',
+            'A withdrawal request stops the 5% commission. If that withdrawal is rejected, the commission continues.',
             'Commission rates and slot amounts may change at any time without prior notice.',
             'Earnings shown in the app are subject to verification and may be adjusted if an error or fraudulent activity is found.',
         ],
@@ -66,11 +65,9 @@ const SECTIONS = [
         title: '7. Referral Programme',
         points: [
             'You earn a bonus on every slot bought by a user who registered with your invitation link.',
-            '1 to 5 referrals: 0.10% of each slot they buy.',
-            'More than 5 referrals: 0.20% of each slot they buy.',
-            '10 referrals: 0.50% of each slot they buy.',
-            'A single user can refer a maximum of 10 people. Signups beyond that limit will not be linked to your team.',
-            'The referral bonus is credited when the referred user\'s deposit is approved, and is locked until you put that amount on a slot.',
+            'You earn 0.10% of each slot they buy.',
+            'The referral bonus is paid for a maximum of 5 referrals. Signups beyond that limit will not be linked to your team.',
+            'The referral bonus is credited when the referred user\'s deposit is approved.',
             'Self-referrals, fake accounts and referrals created to farm bonuses will result in a permanent ban and forfeiture of the bonus.',
         ],
     },

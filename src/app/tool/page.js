@@ -1,15 +1,27 @@
 'use client'
 
 import { createClient } from '@/utils/supabase/client'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Plus, Headset, Info, AlertTriangle, BookOpen } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { useCachedQuery, useSessionUser } from '@/hooks/useCachedQuery'
 
 export default function ToolPage() {
-    const [tools, setTools] = useState([])
-    const [loading, setLoading] = useState(true)
     const supabase = createClient()
-    const router = useRouter()
+    const user = useSessionUser()
+    // Read once: the React Compiler would otherwise read user.id while user is still null
+    const userId = user?.id
+
+    const { data: tools = [], loading, refresh: fetchTools, mutate: setTools } = useCachedQuery(
+        userId ? `tools:${userId}` : null,
+        async () => {
+            const { data, error } = await supabase
+                .from('user_tools')
+                .select('*')
+                .order('created_at', { ascending: false })
+            if (error) throw error
+            return data
+        }
+    )
 
     const [showAddModal, setShowAddModal] = useState(false)
     const [newUpiId, setNewUpiId] = useState('')
@@ -18,33 +30,12 @@ export default function ToolPage() {
     const [warning, setWarning] = useState('')
     const [showLimitModal, setShowLimitModal] = useState(false)
 
-    useEffect(() => {
-        fetchTools()
-    }, [])
-
-    const fetchTools = async () => {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) {
-            router.push('/login')
-            return
-        }
-
-        const { data, error } = await supabase
-            .from('user_tools')
-            .select('*')
-            .order('created_at', { ascending: false })
-
-        if (data) setTools(data)
-        setLoading(false)
-    }
-
     const handleAddClick = async () => {
         // limit check
         try {
-            const { data: { user } } = await supabase.auth.getUser()
             if (!user) return
 
-            const { data: count, error } = await supabase.rpc('get_daily_tool_count', { target_user_id: user.id })
+            const { data: count, error } = await supabase.rpc('get_daily_tool_count', { target_user_id: userId })
 
             if (error) {
                 console.error(error)
@@ -115,7 +106,6 @@ export default function ToolPage() {
             return
         }
 
-        const { data: { user } } = await supabase.auth.getUser()
         if (!user) return
 
         try {
@@ -132,7 +122,7 @@ export default function ToolPage() {
             }
 
             const { error } = await supabase.from('user_tools').insert({
-                user_id: user.id,
+                user_id: userId,
                 upi_id: newUpiId,
                 name: upiName, // Insert Name
                 status: 'pending_verification', // New Default Status
@@ -168,7 +158,7 @@ export default function ToolPage() {
         const newStatus = currentStatus === 'running' ? 'stopped' : 'running'
 
         // Optimistic update
-        setTools(tools.map(t => t.id === id ? { ...t, status: newStatus } : t))
+        setTools((prev = []) => prev.map(t => t.id === id ? { ...t, status: newStatus } : t))
 
         const { error } = await supabase
             .from('user_tools')
@@ -178,12 +168,10 @@ export default function ToolPage() {
         if (error) {
             console.error('Error updating status:', error)
             // Revert on error
-            setTools(tools.map(t => t.id === id ? { ...t, status: currentStatus } : t))
+            setTools((prev = []) => prev.map(t => t.id === id ? { ...t, status: currentStatus } : t))
             alert('Failed to update status')
         }
     }
-
-    if (loading) return <div className="flex min-h-screen items-center justify-center text-[var(--text-muted)]">Loading...</div>
 
     return (
         <div className="relative min-h-screen pb-28">
@@ -215,18 +203,19 @@ export default function ToolPage() {
                         <p>We&apos;re delighted to have you with us.</p>
                         <p>
                             At <span className="font-semibold text-white">E Pay</span>, every slot you buy earns a{' '}
-                            <span className="font-semibold text-navy-300">5% commission</span>, credited to your wallet{' '}
-                            <span className="font-semibold text-navy-300">24 hours</span> after the slot is approved.
+                            <span className="font-semibold text-navy-300">5% commission every 24 hours</span>, for as long
+                            as you do not withdraw.
                         </p>
                         <p>
-                            Commission and bonus amounts must be put on a slot before they can be withdrawn. Only the
-                            amount you have placed on a slot is withdrawable.
+                            INR deposits are locked for the first{' '}
+                            <span className="font-semibold text-navy-300">24 hours</span> only; after that your whole
+                            balance can be withdrawn at any time (max 3 withdrawal requests a day). USDT
+                            deposits are never locked.
                         </p>
                         <p>
-                            Invite friends and earn on every slot they buy —{' '}
-                            <span className="font-semibold text-navy-300">0.10%</span> for 1-5 referrals,{' '}
-                            <span className="font-semibold text-navy-300">0.20%</span> above 5, and{' '}
-                            <span className="font-semibold text-navy-300">0.50%</span> at 10. You can refer up to 10 people.
+                            Invite friends and earn{' '}
+                            <span className="font-semibold text-navy-300">0.10%</span> on every slot they buy. The referral
+                            bonus is paid for up to 5 referrals.
                         </p>
                         <p>Thank you for choosing E Pay—we&apos;re excited to have you as part of our community.</p>
                     </div>
@@ -313,7 +302,11 @@ export default function ToolPage() {
                     </div>
                 ))}
 
-                {tools.length === 0 && (
+                {loading && (
+                    <div className="mt-20 text-center text-[var(--text-dim)]">Loading...</div>
+                )}
+
+                {!loading && tools.length === 0 && (
                     <div className="mt-20 text-center text-[var(--text-dim)]">
                         <p>No tools active.</p>
                         <p className="text-sm">Click + to add.</p>

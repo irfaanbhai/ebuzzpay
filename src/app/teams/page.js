@@ -4,6 +4,7 @@ import { Users, Copy, Share2, Facebook, Send, QrCode, Check, X } from 'lucide-re
 import { QRCodeSVG } from 'qrcode.react'
 import { createClient } from '@/utils/supabase/client'
 import { useEffect, useState } from 'react'
+import { useCachedQuery, useSessionUser } from '@/hooks/useCachedQuery'
 
 const INVITE_TEXT = 'Join me and start earning! Sign up with my invite link:'
 
@@ -36,61 +37,46 @@ const copyText = async (text) => {
     return ok
 }
 
+const DEFAULT_STATS = {
+    total_commission: 0,
+    commission_today: 0,
+    commission_yesterday: 0,
+    team_count: 0,
+    level_b_count: 0,
+    level_c_count: 0,
+    today_new_team: 0,
+    referral_earned: 0,
+    referral_rate: 0,
+    referral_limit: 5,
+    referral_slots_left: 5
+}
+
 export default function TeamsPage() {
-    const [stats, setStats] = useState({
-        total_commission: 0,
-        commission_today: 0,
-        commission_yesterday: 0,
-        team_count: 0,
-        level_b_count: 0,
-        level_c_count: 0,
-        today_new_team: 0,
-        referral_earned: 0,
-        referral_rate: 0,
-        referral_limit: 10,
-        referral_slots_left: 10
-    })
-    const [referralCode, setReferralCode] = useState('')
-    const [loading, setLoading] = useState(true)
+    const user = useSessionUser()
+    // Read once: the React Compiler would otherwise read user.id while user is still null
+    const userId = user?.id
     const [origin, setOrigin] = useState('')
     const [copied, setCopied] = useState(false)
     const [isQrOpen, setIsQrOpen] = useState(false)
-    const supabase = createClient()
 
     // window only exists in the browser; reading it during render breaks hydration
     useEffect(() => {
         setOrigin(window.location.origin)
     }, [])
 
+    const { data } = useCachedQuery(userId ? `team:${userId}` : null, async () => {
+        const supabase = createClient()
+        const [profileRes, statsRes] = await Promise.all([
+            supabase.from('profiles').select('referral_code').eq('id', userId).single(),
+            supabase.rpc('get_team_stats', { query_user_id: userId }),
+        ])
+        if (statsRes.error) throw statsRes.error
+        return { referralCode: profileRes.data?.referral_code || '', stats: statsRes.data }
+    })
+
+    const stats = data?.stats || DEFAULT_STATS
+    const referralCode = data?.referralCode || ''
     const inviteLink = referralCode && origin ? `${origin}/register?ref=${referralCode}` : ''
-
-    useEffect(() => {
-        fetchTeamData()
-    }, [])
-
-    const fetchTeamData = async () => {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
-
-        // Fetch Profile for referral code
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('referral_code')
-            .eq('id', user.id)
-            .single()
-
-        if (profile) setReferralCode(profile.referral_code)
-
-        // Fetch Stats
-        const { data: teamStats, error } = await supabase.rpc('get_team_stats', { query_user_id: user.id })
-
-        if (teamStats) {
-            setStats(teamStats)
-        } else {
-            console.error(error)
-        }
-        setLoading(false)
-    }
 
     const copyToClipboard = async () => {
         if (!inviteLink) return
@@ -260,9 +246,7 @@ export default function TeamsPage() {
                         <div className="text-right">Status</div>
                     </div>
                     {[
-                        { label: '1 - 5 users', rate: '0.10%', min: 1, max: 5 },
-                        { label: '6 - 9 users', rate: '0.20%', min: 6, max: 9 },
-                        { label: '10 users (max)', rate: '0.50%', min: 10, max: 10 },
+                        { label: '1 - 5 users (max)', rate: '0.10%', min: 1, max: 5 },
                     ].map((row) => {
                         const active = stats.team_count >= row.min && stats.team_count <= row.max
                         return (
@@ -287,7 +271,7 @@ export default function TeamsPage() {
                     </div>
                     <p className="text-xs leading-relaxed text-[var(--text-dim)]">
                         You earn this rate on every slot your referrals buy, credited when their deposit is approved.
-                        Bonus amounts must be put on a slot before they can be withdrawn. Maximum {stats.referral_limit} referrals per user.
+                        The referral bonus is paid for your first {stats.referral_limit} referrals only.
                     </p>
                 </div>
             </div>
