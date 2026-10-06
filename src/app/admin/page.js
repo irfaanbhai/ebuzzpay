@@ -552,7 +552,21 @@ export default function AdminPage() {
                                                 )}
                                             </h3>
                                         </div>
-                                        <span className="text-xs text-[var(--text-dim)]">{new Date(txn.created_at).toLocaleDateString()}</span>
+                                    </div>
+                                    <div className="mb-2 grid gap-1 text-[11px] text-[var(--text-muted)] sm:grid-cols-2">
+                                        <p>Requested: <span className="font-bold text-white/90">{formatIst(txn.created_at)}</span></p>
+                                        <p>
+                                            {txn.status === 'pending' ? 'Waiting for approval' : <>{txn.status === 'approved' ? 'Approved' : 'Rejected'}: <span className="font-bold text-white/90">{formatIst(txn.processed_at)}</span></>}
+                                        </p>
+                                        {txn.type === 'withdrawal' && txn.status === 'rejected' && (
+                                            <p className={`sm:col-span-2 font-bold ${txn.refunded_at ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                                {txn.refunded_at
+                                                    ? `₹${txn.amount} returned to wallet: ${formatIst(txn.refunded_at)}`
+                                                    : txn.balance_held
+                                                        ? 'No refund recorded - check this user\'s balance'
+                                                        : 'Not refunded: this older request never left the wallet'}
+                                            </p>
+                                        )}
                                     </div>
                                     <div className="mb-4 rounded-lg border border-white/5 bg-white/5 p-2 text-xs text-[var(--text-muted)]">
                                         <p>User: {txn.email || txn.user_id}</p>
