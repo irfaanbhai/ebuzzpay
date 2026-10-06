@@ -4,6 +4,28 @@ import { createClient } from '@/utils/supabase/client'
 import { useEffect, useState } from 'react'
 import { CheckCircle, XCircle, Clock, LayoutDashboard, Users, Receipt, Smartphone, Play, Square } from 'lucide-react'
 
+// Dates in India time, with the date, for investigating user activity
+const formatIst = (value) => value
+    ? new Date(value).toLocaleString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true,
+    })
+    : '—'
+
+const formatLeft = (ms) => {
+    const diff = Math.max(0, ms)
+    const pad = (n) => String(n).padStart(2, '0')
+    return `${pad(Math.floor(diff / 3600000))}:${pad(Math.floor(diff / 60000) % 60)}:${pad(Math.floor(diff / 1000) % 60)}`
+}
+
+const STATUS_COLORS = {
+    approved: 'text-emerald-400',
+    pending: 'text-amber-400',
+    rejected: 'text-red-400',
+    expired: 'text-red-400',
+}
+
 export default function AdminPage() {
     const [isAuthenticated, setIsAuthenticated] = useState(false)
     const [password, setPassword] = useState('')
@@ -46,6 +68,25 @@ export default function AdminPage() {
 
     const [loading, setLoading] = useState(true)
     const supabase = createClient()
+
+    // Users tab: live bonus timers and one user's money timeline
+    const [now, setNow] = useState(() => Date.now())
+    const [historyUser, setHistoryUser] = useState(null)
+    const [historyRows, setHistoryRows] = useState([])
+
+    useEffect(() => {
+        if (activeTab !== 'users') return
+        const id = setInterval(() => setNow(Date.now()), 1000)
+        return () => clearInterval(id)
+    }, [activeTab])
+
+    const openUserHistory = async (user) => {
+        setHistoryUser(user)
+        setHistoryRows([])
+        const { data, error } = await supabase.rpc('get_admin_user_history', { target_user_id: user.id })
+        if (error) console.error(error)
+        else setHistoryRows(data || [])
+    }
 
     useEffect(() => {
         // Check localStorage for saved password
@@ -585,6 +626,7 @@ export default function AdminPage() {
                                             )}
                                         </div>
                                         <div className="flex gap-2">
+                                            <button onClick={() => openUserHistory(user)} className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-bold text-white/80 hover:bg-white/10">History</button>
                                             <button onClick={() => handleEditBalance(user.id, user.balance)} className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-bold text-white/80 hover:bg-white/10">Edit</button>
                                             <button
                                                 onClick={async () => {
@@ -603,6 +645,46 @@ export default function AdminPage() {
                                             >
                                                 {user.is_banned ? 'Unban' : 'Ban'}
                                             </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Bonus timer and latest deposit / withdrawal */}
+                                    <div className="grid gap-2 rounded-lg border border-white/5 bg-white/5 p-3 text-[11px] sm:grid-cols-3">
+                                        <div>
+                                            <p className="text-[10px] font-bold uppercase text-[var(--text-dim)]">5% Bonus Timer</p>
+                                            {user.bonus_next_at ? (
+                                                <>
+                                                    <p className="font-mono text-sm font-bold text-navy-300">{formatLeft(new Date(user.bonus_next_at).getTime() - now)}</p>
+                                                    <p className="text-[var(--text-muted)]">Next ₹{user.bonus_next_payout} (5% of ₹{user.bonus_base})</p>
+                                                    <p className="text-[var(--text-muted)]">at {formatIst(user.bonus_next_at)}</p>
+                                                </>
+                                            ) : (
+                                                <p className="text-sm font-bold text-white/40">Stopped</p>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-bold uppercase text-[var(--text-dim)]">Last Deposit</p>
+                                            {user.last_deposit ? (
+                                                <>
+                                                    <p className="text-sm font-bold text-white">₹{user.last_deposit.amount} <span className={`text-[10px] uppercase ${STATUS_COLORS[user.last_deposit.status] || ''}`}>{user.last_deposit.status}</span></p>
+                                                    <p className="text-[var(--text-muted)]">Requested {formatIst(user.last_deposit.requested_at)}</p>
+                                                    <p className="text-[var(--text-muted)]">Processed {formatIst(user.last_deposit.processed_at)}</p>
+                                                </>
+                                            ) : (
+                                                <p className="text-sm font-bold text-white/40">None</p>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-bold uppercase text-[var(--text-dim)]">Last Withdrawal</p>
+                                            {user.last_withdrawal ? (
+                                                <>
+                                                    <p className="text-sm font-bold text-white">₹{user.last_withdrawal.amount} <span className={`text-[10px] uppercase ${STATUS_COLORS[user.last_withdrawal.status] || ''}`}>{user.last_withdrawal.status}</span></p>
+                                                    <p className="text-[var(--text-muted)]">Requested {formatIst(user.last_withdrawal.requested_at)}</p>
+                                                    <p className="text-[var(--text-muted)]">Processed {formatIst(user.last_withdrawal.processed_at)}</p>
+                                                </>
+                                            ) : (
+                                                <p className="text-sm font-bold text-white/40">None</p>
+                                            )}
                                         </div>
                                     </div>
 
@@ -962,6 +1044,60 @@ export default function AdminPage() {
                         </div>
                     )}
                 </>
+            )}
+
+            {/* Modal for one user's money timeline */}
+            {historyUser && (
+                <div className="anim-fade fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+                    <div className="anim-pop glass-strong flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl">
+                        <div className="flex items-center justify-between border-b border-white/10 bg-white/5 p-4">
+                            <div className="min-w-0">
+                                <h2 className="truncate font-bold text-white">{historyUser.email}</h2>
+                                <p className="text-xs text-[var(--text-muted)]">
+                                    Balance ₹{historyUser.balance} · Bonus timer {historyUser.bonus_next_at ? `next at ${formatIst(historyUser.bonus_next_at)}` : 'stopped'}
+                                </p>
+                            </div>
+                            <button onClick={() => setHistoryUser(null)} className="rounded-full bg-white/10 p-2 hover:bg-white/20">
+                                <XCircle className="h-5 w-5 text-[var(--text-muted)]" />
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-auto p-4">
+                            <table className="w-full text-left text-xs">
+                                <thead className="text-[10px] uppercase text-[var(--text-dim)]">
+                                    <tr>
+                                        <th className="py-2 pr-3">Type</th>
+                                        <th className="py-2 pr-3">Amount</th>
+                                        <th className="py-2 pr-3">Status</th>
+                                        <th className="py-2 pr-3">Requested (IST)</th>
+                                        <th className="py-2 pr-3">Processed (IST)</th>
+                                        <th className="py-2">Method / UTR</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {historyRows.map(row => (
+                                        <tr key={row.id} className="border-t border-white/5 align-top">
+                                            <td className="py-2 pr-3 font-bold capitalize text-white">{row.type}</td>
+                                            <td className={`py-2 pr-3 font-bold ${row.type === 'withdrawal' ? 'text-red-400' : 'text-emerald-400'}`}>
+                                                {row.type === 'withdrawal' ? '-' : '+'}₹{row.amount}
+                                            </td>
+                                            <td className={`py-2 pr-3 uppercase ${STATUS_COLORS[row.status] || 'text-white/70'}`}>{row.status}</td>
+                                            <td className="whitespace-nowrap py-2 pr-3 text-[var(--text-muted)]">{formatIst(row.requested_at)}</td>
+                                            <td className="whitespace-nowrap py-2 pr-3 text-[var(--text-muted)]">{formatIst(row.processed_at)}</td>
+                                            <td className="py-2 text-[var(--text-dim)]">
+                                                {row.payment_method}{row.upi_id ? ` · ${row.upi_id}` : ''}
+                                                <div className="font-mono text-[10px]">{row.utr}</div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                            {historyRows.length === 0 && (
+                                <p className="py-4 text-center text-sm text-[var(--text-dim)]">No transactions</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
             )}
 
             {/* Modal for Withdrawal Detail */}
