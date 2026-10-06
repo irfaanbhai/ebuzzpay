@@ -50,8 +50,8 @@ export default function Home() {
   })
 
   // Same timer as the Assets page: stopped until a slot purchase, then
-  // counts down to the next 5% payout, restarting after each one until the
-  // user withdraws. The total is the paid amount still earning, no bonus.
+  // counts down to the next 5% payout until the wallet is emptied. The
+  // total is the wallet amount that payout is 5% of.
   const { left: cycleLeft, total: todayRecharge } = useSlotCycle(user?.id)
 
   useEffect(() => {
@@ -160,7 +160,7 @@ export default function Home() {
             </span>
           </div>
           <p className="mb-4 text-xs text-[var(--text-dim)]">
-            Pick a slot and pay by UPI. You get 5% every 24 hours after approval until you withdraw.
+            Pick a slot and pay by UPI. You get 5% of your wallet every 24 hours after approval.
           </p>
 
           <div className="space-y-3">

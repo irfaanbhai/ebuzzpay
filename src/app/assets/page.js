@@ -245,7 +245,7 @@ export default function AssetsPage() {
                     <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-white/10 pt-2">
                         <p className="min-w-0 text-[10px] leading-relaxed text-[var(--text-dim)]">
                             {bonusLeft
-                                ? 'You get 5% every 24 hours until you withdraw. The timer restarts after each payout.'
+                                ? 'You get 5% of your wallet every 24 hours. Withdrawing lowers the amount but the timer keeps running.'
                                 : 'Timer starts when your slot purchase is approved.'}
                         </p>
                         {pendingCommission > 0 && (
@@ -432,7 +432,7 @@ export default function AssetsPage() {
 
                                 {pendingCommission > 0 && (
                                     <p className="mt-2 text-xs leading-relaxed text-amber-300/90">
-                                        Withdrawing stops your 5% bonus of ₹{pendingCommission.toFixed(2)} every 24 hours.
+                                        Your 5% bonus keeps running on what stays in your wallet. Withdrawing everything stops it.
                                     </p>
                                 )}
 

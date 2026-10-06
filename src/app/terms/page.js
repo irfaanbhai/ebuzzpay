@@ -54,9 +54,9 @@ const SECTIONS = [
     {
         title: '6. Slot Commission (5%)',
         points: [
-            'Every approved slot purchase earns a 5% commission.',
-            'The commission is credited to your wallet every 24 hours after the slot purchase is approved, for as long as you do not withdraw.',
-            'A withdrawal request stops the 5% commission. If that withdrawal is rejected, the commission continues.',
+            'Your wallet earns a 5% commission every 24 hours, starting 24 hours after your first slot purchase is approved.',
+            'The commission is 5% of your wallet balance, including earlier commission and bonus. Money deposited less than 24 hours before a payout is counted from the next payout.',
+            'A withdrawal lowers the amount the commission is paid on, but does not stop the timer. The commission stops only when your wallet balance reaches zero.',
             'Commission rates and slot amounts may change at any time without prior notice.',
             'Earnings shown in the app are subject to verification and may be adjusted if an error or fraudulent activity is found.',
         ],
