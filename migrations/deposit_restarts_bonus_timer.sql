@@ -17,10 +17,13 @@
 --   * The timer stops only when the wallet reaches 0.
 -- =====================================================================
 
--- Users who deposited after their current cycle started: restart their
--- timer from that deposit, as if this rule had been live already
+-- Users who deposited in the last 48 hours: move their timer onto that
+-- deposit's 24 hour rhythm (next slot still ahead), as if this rule had
+-- been live already. Payouts that slot would have made in the past are
+-- not paid here.
 update public.profiles p
-  set bonus_next_at = d.last_approved + interval '24 hours'
+  set bonus_next_at = d.last_approved
+        + interval '24 hours' * greatest(1, ceil(extract(epoch from (now() - d.last_approved)) / 86400))
   from (
     select user_id, max(created_at) as last_approved
     from public.slot_commissions
@@ -28,7 +31,7 @@ update public.profiles p
   ) d
   where d.user_id = p.id
     and p.bonus_next_at is not null
-    and d.last_approved > p.bonus_next_at - interval '24 hours';
+    and d.last_approved > now() - interval '48 hours';
 
 -- ---------------------------------------------------------------------
 -- Pay every 24 hour cycle that has come due: 5% of the wallet
