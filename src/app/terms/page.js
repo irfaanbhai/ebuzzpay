@@ -54,8 +54,8 @@ const SECTIONS = [
     {
         title: '6. Slot Commission (5%)',
         points: [
-            'Your wallet earns a 5% commission every 24 hours, starting 24 hours after your first slot purchase is approved.',
-            'The commission is 5% of your wallet balance, including earlier commission and bonus. Money deposited less than 24 hours before a payout is counted from the next payout.',
+            'Your wallet earns a 5% commission every 24 hours. Every approved slot purchase restarts this 24 hour timer.',
+            'The commission is 5% of your whole wallet balance, including the new purchase, earlier commission and bonus. A new INR purchase cannot be withdrawn until its 24 hours have passed.',
             'A withdrawal lowers the amount the commission is paid on, but does not stop the timer. The commission stops only when your wallet balance reaches zero.',
             'Commission rates and slot amounts may change at any time without prior notice.',
             'Earnings shown in the app are subject to verification and may be adjusted if an error or fraudulent activity is found.',

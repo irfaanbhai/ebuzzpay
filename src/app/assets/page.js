@@ -245,7 +245,7 @@ export default function AssetsPage() {
                     <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-white/10 pt-2">
                         <p className="min-w-0 text-[10px] leading-relaxed text-[var(--text-dim)]">
                             {bonusLeft
-                                ? 'You get 5% of your wallet every 24 hours. Withdrawing lowers the amount but the timer keeps running.'
+                                ? 'You get 5% of your wallet every 24 hours. A deposit restarts the timer; withdrawing lowers the amount but the timer keeps running.'
                                 : 'Timer starts when your slot purchase is approved.'}
                         </p>
                         {pendingCommission > 0 && (
