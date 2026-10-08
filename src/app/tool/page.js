@@ -215,7 +215,7 @@ export default function ToolPage() {
                         <p>
                             Invite friends and earn{' '}
                             <span className="font-semibold text-navy-300">0.10%</span> on every slot they buy. The referral
-                            bonus is paid for up to 5 referrals.
+                            bonus is paid for up to 10 referrals.
                         </p>
                         <p>Thank you for choosing E Pay—we&apos;re excited to have you as part of our community.</p>
                     </div>

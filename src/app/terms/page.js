@@ -66,7 +66,7 @@ const SECTIONS = [
         points: [
             'You earn a bonus on every slot bought by a user who registered with your invitation link.',
             'You earn 0.10% of each slot they buy.',
-            'The referral bonus is paid for a maximum of 5 referrals. Signups beyond that limit will not be linked to your team.',
+            'The referral bonus is paid for a maximum of 10 referrals. Signups beyond that limit still join your team but do not earn a referral bonus.',
             'The referral bonus is credited when the referred user\'s deposit is approved.',
             'Self-referrals, fake accounts and referrals created to farm bonuses will result in a permanent ban and forfeiture of the bonus.',
         ],

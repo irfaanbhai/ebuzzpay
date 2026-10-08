@@ -47,8 +47,8 @@ const DEFAULT_STATS = {
     today_new_team: 0,
     referral_earned: 0,
     referral_rate: 0,
-    referral_limit: 5,
-    referral_slots_left: 5
+    referral_limit: 10,
+    referral_slots_left: 10
 }
 
 export default function TeamsPage() {
@@ -180,13 +180,13 @@ export default function TeamsPage() {
                     <div className="mb-3 flex items-center justify-between">
                         <h3 className="text-sm font-semibold text-white/90">Invitation Link</h3>
                         <span className="rounded-full bg-navy-500/15 px-3 py-1 text-[10px] font-bold text-navy-300">
-                            {stats.team_count} / {stats.referral_limit} invited
+                            {Math.min(stats.team_count, stats.referral_limit)} / {stats.referral_limit} bonus referrals
                         </span>
                     </div>
                     {/* {stats.referral_slots_left === 0 && (
                         <p className="mb-3 rounded-lg border border-amber-400/25 bg-amber-500/10 p-2 text-xs text-amber-200/90">
-                            You have reached the limit of {stats.referral_limit} referrals. New signups on your link will
-                            not be linked to your team.
+                            You have reached the limit of {stats.referral_limit} bonus referrals. New signups on your link
+                            will still join your team, but will not earn you a referral bonus.
                         </p>
                     )} */}
                     <div className="flex gap-2">
@@ -246,7 +246,7 @@ export default function TeamsPage() {
                         <div className="text-right">Status</div>
                     </div>
                     {[
-                        { label: '1 - 5 users (max)', rate: '0.10%', min: 1, max: 5 },
+                        { label: 'First 10 users', rate: '0.10%', min: 1, max: Infinity },
                     ].map((row) => {
                         const active = stats.team_count >= row.min && stats.team_count <= row.max
                         return (
@@ -271,7 +271,8 @@ export default function TeamsPage() {
                     </div>
                     <p className="text-xs leading-relaxed text-[var(--text-dim)]">
                         You earn this rate on every slot your referrals buy, credited when their deposit is approved.
-                        The referral bonus is paid for your first {stats.referral_limit} referrals only.
+                        The referral bonus is paid for your first {stats.referral_limit} referrals only. Anyone after that still
+                        joins your team.
                     </p>
                 </div>
             </div>
