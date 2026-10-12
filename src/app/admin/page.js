@@ -29,7 +29,14 @@ const STATUS_COLORS = {
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [password, setPassword] = useState('')
+  const [loggingIn, setLoggingIn] = useState(false)
   const [activeTab, setActiveTab] = useState('dashboard') // Default to dashboard
+
+  // Admin password change (Settings tab)
+  const [currentAdminPassword, setCurrentAdminPassword] = useState('')
+  const [newAdminPassword, setNewAdminPassword] = useState('')
+  const [confirmAdminPassword, setConfirmAdminPassword] = useState('')
+  const [changingPassword, setChangingPassword] = useState(false)
 
   // Data States
   const [transactions, setTransactions] = useState([])
@@ -89,9 +96,9 @@ export default function AdminPage() {
   }
 
   useEffect(() => {
-    // Check localStorage for saved password
-    const savedPassword = localStorage.getItem('adminPassword')
-    if (savedPassword === 'admin@1212') {
+    // Restore the session flag set after a successful DB-verified login.
+    // The password itself is never stored on the client.
+    if (localStorage.getItem('adminAuthed') === '1') {
       setIsAuthenticated(true)
     }
   }, [])
@@ -134,19 +141,65 @@ export default function AdminPage() {
     }
   }, [toolsSearch, toolsPage])
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault()
-    if (password === 'siya@ram') {
-      setIsAuthenticated(true)
-      localStorage.setItem('adminPassword', password)
-    } else {
-      alert('Invalid Password')
+    if (loggingIn) return
+    setLoggingIn(true)
+    try {
+      const { data, error } = await supabase.rpc('verify_admin_password', { p_password: password })
+      if (error) throw error
+      if (data === true) {
+        setIsAuthenticated(true)
+        localStorage.setItem('adminAuthed', '1')
+        setPassword('')
+      } else {
+        alert('Invalid Password')
+      }
+    } catch (err) {
+      console.error(err)
+      alert('Could not verify password. Please try again.')
+    } finally {
+      setLoggingIn(false)
     }
   }
 
   const handleLogout = () => {
     setIsAuthenticated(false)
-    localStorage.removeItem('adminPassword')
+    localStorage.removeItem('adminAuthed')
+  }
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault()
+    if (changingPassword) return
+    if (newAdminPassword !== confirmAdminPassword) {
+      alert('New passwords do not match')
+      return
+    }
+    if (newAdminPassword.length < 6) {
+      alert('New password must be at least 6 characters')
+      return
+    }
+    setChangingPassword(true)
+    try {
+      const { data, error } = await supabase.rpc('change_admin_password', {
+        p_current: currentAdminPassword,
+        p_new: newAdminPassword,
+      })
+      if (error) throw error
+      if (data === true) {
+        alert('Admin password changed successfully')
+        setCurrentAdminPassword('')
+        setNewAdminPassword('')
+        setConfirmAdminPassword('')
+      } else {
+        alert('Current password is incorrect')
+      }
+    } catch (err) {
+      console.error(err)
+      alert(err.message || 'Could not change password')
+    } finally {
+      setChangingPassword(false)
+    }
   }
 
   const fetchData = async () => {
@@ -452,7 +505,7 @@ export default function AdminPage() {
             onChange={(e) => setPassword(e.target.value)}
             className="mb-4 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:border-navy-400 focus:outline-none focus:ring-2 focus:ring-navy-500/30"
           />
-          <button type="submit" className="btn-navy w-full rounded-xl py-3 font-bold">Login</button>
+          <button type="submit" disabled={loggingIn} className="btn-navy w-full rounded-xl py-3 font-bold disabled:opacity-60">{loggingIn ? 'Verifying...' : 'Login'}</button>
         </form>
       </div>
     )
@@ -575,6 +628,17 @@ export default function AdminPage() {
                       <p className="mt-1 font-bold text-white/90">
                         {txn.type === 'withdrawal' ? 'Pay to UPI' : 'Paid from UPI'}: {txn.upi_id}
                       </p>
+                    )}
+                    {txn.type === 'withdrawal' && txn.withdrawal_details && (
+                      <div className="mt-1 rounded-md border border-navy-400/30 bg-navy-500/10 p-2">
+                        <p className="font-bold text-navy-200">Pay to Bank Account</p>
+                        <p className="text-white/90">Name: {txn.withdrawal_details.account_holder}</p>
+                        <p className="text-white/90">A/C: {txn.withdrawal_details.account_number}</p>
+                        <p className="text-white/90">IFSC: {txn.withdrawal_details.ifsc_code}</p>
+                        {txn.withdrawal_details.bank_name && (
+                          <p className="text-white/90">Bank: {txn.withdrawal_details.bank_name}</p>
+                        )}
+                      </div>
                     )}
                     {txn.currency === 'USDT' && (
                       <p className="mt-1 font-bold text-navy-300">
@@ -859,6 +923,58 @@ export default function AdminPage() {
           {activeTab === 'settings' && (
             <div className="space-y-4">
               <div className="glass rounded-2xl p-6">
+                <h3 className="mb-4 text-lg font-bold text-white">Admin Password</h3>
+                <form onSubmit={handleChangePassword} className="space-y-4">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-[var(--text-muted)]">Current Password</label>
+                    <input
+                      type="password"
+                      value={currentAdminPassword}
+                      onChange={(e) => setCurrentAdminPassword(e.target.value)}
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none focus:border-navy-400 focus:ring-2 focus:ring-navy-500/30"
+                      placeholder="Enter current password"
+                      autoComplete="current-password"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-[var(--text-muted)]">New Password</label>
+                    <input
+                      type="password"
+                      value={newAdminPassword}
+                      onChange={(e) => setNewAdminPassword(e.target.value)}
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none focus:border-navy-400 focus:ring-2 focus:ring-navy-500/30"
+                      placeholder="At least 6 characters"
+                      autoComplete="new-password"
+                      minLength={6}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-[var(--text-muted)]">Confirm New Password</label>
+                    <input
+                      type="password"
+                      value={confirmAdminPassword}
+                      onChange={(e) => setConfirmAdminPassword(e.target.value)}
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none focus:border-navy-400 focus:ring-2 focus:ring-navy-500/30"
+                      placeholder="Re-enter new password"
+                      autoComplete="new-password"
+                      minLength={6}
+                      required
+                    />
+                    <p className="mt-1 text-xs text-[var(--text-dim)]">The password is stored securely (hashed) in the database, not in the app code.</p>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={changingPassword}
+                    className="btn-navy rounded-lg px-6 py-2 text-sm font-bold disabled:opacity-60"
+                  >
+                    {changingPassword ? 'Updating...' : 'Change Password'}
+                  </button>
+                </form>
+              </div>
+
+              <div className="glass rounded-2xl p-6">
                 <h3 className="mb-4 text-lg font-bold text-white">Payment Settings</h3>
                 <form onSubmit={handleUpdateUpi} className="space-y-4">
                   <div>
@@ -1100,6 +1216,11 @@ export default function AdminPage() {
                       <td className="whitespace-nowrap py-2 pr-3 text-[var(--text-muted)]">{formatIst(row.processed_at)}</td>
                       <td className="py-2 text-[var(--text-dim)]">
                         {row.payment_method}{row.upi_id ? ` · ${row.upi_id}` : ''}
+                        {row.withdrawal_details && (
+                          <div className="text-[10px] text-navy-200">
+                            {row.withdrawal_details.account_number} · {row.withdrawal_details.ifsc_code}
+                          </div>
+                        )}
                         <div className="font-mono text-[10px]">{row.utr}</div>
                       </td>
                     </tr>

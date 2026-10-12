@@ -180,6 +180,15 @@ export default function HistoryPage({ title, type }) {
                                     <p className="text-xs text-[var(--text-dim)]">{new Date(txn.created_at).toLocaleTimeString()}</p>
                                 </div>
                             </div>
+                            {txn.type === 'withdrawal' && (txn.upi_id || txn.withdrawal_details) && (
+                                <div className="mt-2 border-t border-white/5 pt-2 text-xs text-[var(--text-muted)]">
+                                    {txn.withdrawal_details ? (
+                                        <span>To bank: {txn.withdrawal_details.account_number} · {txn.withdrawal_details.ifsc_code}</span>
+                                    ) : (
+                                        <span>To UPI: {txn.upi_id}</span>
+                                    )}
+                                </div>
+                            )}
                             <div className="mt-2 flex items-center justify-between border-t border-white/5 pt-2 text-xs text-[var(--text-muted)]">
                                 <span>Order ID: {txn.utr || 'N/A'}</span>
                             </div>

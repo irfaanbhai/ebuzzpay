@@ -18,6 +18,8 @@ const formatNextCommission = (value) =>
     })
 
 const UPI_PATTERN = /^[a-z0-9._-]+@[a-z]+$/
+const ACCOUNT_PATTERN = /^[0-9]{6,20}$/
+const IFSC_PATTERN = /^[A-Z]{4}0[A-Z0-9]{6}$/
 
 const EMPTY_WALLET = {
     balance: 0,
@@ -27,6 +29,7 @@ const EMPTY_WALLET = {
     pending_commission: 0,
     payout_upi: null,
     payout_upis: [],
+    payout_banks: [],
     withdrawals_today: 0,
     withdrawal_daily_limit: 3,
     today_earnings: 0,
@@ -40,9 +43,17 @@ export default function AssetsPage() {
     // Withdrawal State
     const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false)
     const [withdrawalAmount, setWithdrawalAmount] = useState('')
+    const [payoutMethod, setPayoutMethod] = useState('upi') // 'upi' | 'bank'
     const [selectedUpi, setSelectedUpi] = useState('')
     const [newUpi, setNewUpi] = useState('')
     const [isAddingUpi, setIsAddingUpi] = useState(false)
+    // Bank payout
+    const [selectedBankId, setSelectedBankId] = useState('')
+    const [isAddingBank, setIsAddingBank] = useState(false)
+    const [bankHolder, setBankHolder] = useState('')
+    const [bankAccount, setBankAccount] = useState('')
+    const [bankIfsc, setBankIfsc] = useState('')
+    const [bankName, setBankName] = useState('')
     const [isProcessing, setIsProcessing] = useState(false)
     const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false)
     const [error, setError] = useState('')
@@ -90,12 +101,25 @@ export default function AssetsPage() {
     const withdrawalDailyLimit = Number(w.withdrawal_daily_limit || 3)
     const withdrawalsLeft = Math.max(0, withdrawalDailyLimit - Number(w.withdrawals_today || 0))
     const savedUpis = Array.isArray(w.payout_upis) ? w.payout_upis : []
+    const savedBanks = Array.isArray(w.payout_banks) ? w.payout_banks : []
+
+    const resetBankForm = () => {
+        setBankHolder('')
+        setBankAccount('')
+        setBankIfsc('')
+        setBankName('')
+    }
 
     const openWithdrawModal = () => {
         setError('')
         setNewUpi('')
         setIsAddingUpi(savedUpis.length === 0)
         setSelectedUpi(savedUpis.includes(w.payout_upi) ? w.payout_upi : (savedUpis[0] || ''))
+        // Start on whichever payout method the user already has set up
+        setPayoutMethod(savedUpis.length === 0 && savedBanks.length > 0 ? 'bank' : 'upi')
+        setSelectedBankId(savedBanks[0]?.id || '')
+        setIsAddingBank(savedBanks.length === 0)
+        resetBankForm()
         setIsWithdrawModalOpen(true)
         refreshWallet()
     }
@@ -132,6 +156,64 @@ export default function AssetsPage() {
         if (rest.length === 0) setIsAddingUpi(true)
     }
 
+    // Saves the bank form, returns the saved account's id (or null on error)
+    const saveBank = async () => {
+        const holder = bankHolder.trim()
+        const account = bankAccount.trim()
+        const ifsc = bankIfsc.trim().toUpperCase()
+        const name = bankName.trim()
+
+        if (!holder) {
+            setError('Please enter the account holder name.')
+            return null
+        }
+        if (!ACCOUNT_PATTERN.test(account)) {
+            setError('Account number must be 6–20 digits.')
+            return null
+        }
+        if (!IFSC_PATTERN.test(ifsc)) {
+            setError('Invalid IFSC code. Example: HDFC0001234')
+            return null
+        }
+        setError('')
+
+        // Already saved? reuse it
+        const existing = savedBanks.find((b) => b.account_number === account && b.ifsc_code === ifsc)
+        if (existing) {
+            setSelectedBankId(existing.id)
+            setIsAddingBank(false)
+            resetBankForm()
+            return existing.id
+        }
+
+        const { data, error: insertError } = await supabase
+            .from('user_payout_banks')
+            .insert({ user_id: userId, account_holder: holder, account_number: account, ifsc_code: ifsc, bank_name: name || null })
+            .select()
+            .single()
+        if (insertError) {
+            setError(insertError.message)
+            return null
+        }
+        mutateWallet((prev) => ({ ...(prev || EMPTY_WALLET), payout_banks: [...savedBanks, data] }))
+        setSelectedBankId(data.id)
+        setIsAddingBank(false)
+        resetBankForm()
+        return data.id
+    }
+
+    const removeBank = async (id) => {
+        const { error: deleteError } = await supabase.from('user_payout_banks').delete().eq('user_id', userId).eq('id', id)
+        if (deleteError) {
+            setError(deleteError.message)
+            return
+        }
+        const rest = savedBanks.filter((b) => b.id !== id)
+        mutateWallet((prev) => ({ ...(prev || EMPTY_WALLET), payout_banks: rest }))
+        if (selectedBankId === id) setSelectedBankId(rest[0]?.id || '')
+        if (rest.length === 0) setIsAddingBank(true)
+    }
+
     const handleWithdrawal = async (e) => {
         e.preventDefault()
         setError('')
@@ -139,20 +221,12 @@ export default function AssetsPage() {
 
         try {
             const amount = parseFloat(withdrawalAmount)
-            // A UPI typed in but not saved yet is used as well
-            const upi = (isAddingUpi && newUpi.trim() ? newUpi : selectedUpi).trim().toLowerCase()
 
             if (isNaN(amount) || amount <= 0) {
                 throw new Error('Please enter a valid amount')
             }
             if (amount > balance) {
                 throw new Error('Insufficient balance')
-            }
-            if (!upi) {
-                throw new Error('Please add or select the UPI ID to receive the money.')
-            }
-            if (!UPI_PATTERN.test(upi)) {
-                throw new Error('Invalid UPI ID format. Example: 9876543210@paytm')
             }
             if (withdrawalsLeft <= 0) {
                 throw new Error(`You can make only ${withdrawalDailyLimit} withdrawals per day. Try again tomorrow.`)
@@ -161,9 +235,35 @@ export default function AssetsPage() {
                 throw new Error(`₹${lockedBalance.toFixed(2)} from your INR deposit is locked for its first 24 hours${w.locked_until ? ` (unlocks ${formatNextCommission(w.locked_until)})` : ''}. You can withdraw up to ₹${withdrawableBalance.toFixed(2)} now.`)
             }
 
-            // Server re-checks the time window, daily limit, INR lock and UPI ID,
-            // and takes the amount out of the wallet until the admin decides
-            const { error: txError } = await supabase.rpc('request_withdrawal', { p_amount: amount, p_upi_id: upi })
+            // Build the payout destination: a saved bank account or a UPI ID
+            const rpcArgs = { p_amount: amount }
+            if (payoutMethod === 'bank') {
+                // A bank typed in but not saved yet is saved first
+                let bankId = selectedBankId
+                if (isAddingBank || !bankId) {
+                    bankId = await saveBank()
+                    if (!bankId) {
+                        setIsProcessing(false)
+                        return
+                    }
+                }
+                rpcArgs.p_bank_id = bankId
+            } else {
+                // A UPI typed in but not saved yet is used as well
+                const upi = (isAddingUpi && newUpi.trim() ? newUpi : selectedUpi).trim().toLowerCase()
+                if (!upi) {
+                    throw new Error('Please add or select the UPI ID to receive the money.')
+                }
+                if (!UPI_PATTERN.test(upi)) {
+                    throw new Error('Invalid UPI ID format. Example: 9876543210@paytm')
+                }
+                rpcArgs.p_upi_id = upi
+            }
+
+            // Server re-checks the time window, daily limit, INR lock and the
+            // payout destination, and takes the amount out of the wallet until
+            // the admin decides
+            const { error: txError } = await supabase.rpc('request_withdrawal', rpcArgs)
             if (txError) throw txError
 
             setIsWithdrawModalOpen(false)
@@ -358,62 +458,170 @@ export default function AssetsPage() {
                                     </div>
                                 </div>
 
-                                {/* Payout UPI: any saved ID, or add a new one */}
+                                {/* Payout method: UPI ID or bank account */}
                                 <div className="mt-4">
-                                    <label className="mb-2 block text-sm font-medium text-[var(--text-muted)]">Receive on UPI ID</label>
-                                    <div className="space-y-2">
-                                        {savedUpis.map((upi) => (
-                                            <div
-                                                key={upi}
-                                                className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm transition-colors ${selectedUpi === upi && !isAddingUpi ? 'border-purple-400/60 bg-purple-500/15' : 'border-white/10 bg-white/5'}`}
-                                            >
-                                                <button
-                                                    type="button"
-                                                    onClick={() => { setSelectedUpi(upi); setIsAddingUpi(false) }}
-                                                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                                                >
-                                                    <span className={`h-3.5 w-3.5 shrink-0 rounded-full border-2 ${selectedUpi === upi && !isAddingUpi ? 'border-purple-300 bg-purple-400' : 'border-white/30'}`} />
-                                                    <span className="min-w-0 truncate font-semibold text-white">{upi}</span>
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => removeUpi(upi)}
-                                                    aria-label={`Remove ${upi}`}
-                                                    className="shrink-0 text-[var(--text-dim)] hover:text-red-400"
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </button>
-                                            </div>
-                                        ))}
-
-                                        {isAddingUpi ? (
-                                            <div className="flex gap-2">
-                                                <input
-                                                    type="text"
-                                                    value={newUpi}
-                                                    onChange={(e) => setNewUpi(e.target.value.toLowerCase().trim())}
-                                                    placeholder="e.g. 9876543210@paytm"
-                                                    className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-medium text-white focus:border-navy-400 focus:outline-none focus:ring-2 focus:ring-navy-500/30"
-                                                />
-                                                <button
-                                                    type="button"
-                                                    onClick={saveUpi}
-                                                    disabled={!newUpi}
-                                                    className="btn-navy shrink-0 rounded-xl px-4 text-xs font-bold disabled:opacity-60"
-                                                >
-                                                    Save
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <button
-                                                type="button"
-                                                onClick={() => setIsAddingUpi(true)}
-                                                className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-white/20 py-2.5 text-xs font-bold text-navy-300 hover:bg-white/5"
-                                            >
-                                                <Plus className="h-4 w-4" /> Add another UPI ID
-                                            </button>
-                                        )}
+                                    <label className="mb-2 block text-sm font-medium text-[var(--text-muted)]">Receive via</label>
+                                    <div className="mb-3 grid grid-cols-2 gap-2 rounded-xl border border-white/10 bg-white/5 p-1">
+                                        <button
+                                            type="button"
+                                            onClick={() => { setPayoutMethod('upi'); setError('') }}
+                                            className={`rounded-lg py-2 text-xs font-bold transition-colors ${payoutMethod === 'upi' ? 'bg-purple-500/20 text-purple-200' : 'text-[var(--text-muted)] hover:text-white'}`}
+                                        >
+                                            UPI ID
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setPayoutMethod('bank'); setError('') }}
+                                            className={`rounded-lg py-2 text-xs font-bold transition-colors ${payoutMethod === 'bank' ? 'bg-purple-500/20 text-purple-200' : 'text-[var(--text-muted)] hover:text-white'}`}
+                                        >
+                                            Bank Account
+                                        </button>
                                     </div>
+
+                                    {payoutMethod === 'upi' ? (
+                                        <div className="space-y-2">
+                                            {savedUpis.map((upi) => (
+                                                <div
+                                                    key={upi}
+                                                    className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm transition-colors ${selectedUpi === upi && !isAddingUpi ? 'border-purple-400/60 bg-purple-500/15' : 'border-white/10 bg-white/5'}`}
+                                                >
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { setSelectedUpi(upi); setIsAddingUpi(false) }}
+                                                        className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                                                    >
+                                                        <span className={`h-3.5 w-3.5 shrink-0 rounded-full border-2 ${selectedUpi === upi && !isAddingUpi ? 'border-purple-300 bg-purple-400' : 'border-white/30'}`} />
+                                                        <span className="min-w-0 truncate font-semibold text-white">{upi}</span>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeUpi(upi)}
+                                                        aria-label={`Remove ${upi}`}
+                                                        className="shrink-0 text-[var(--text-dim)] hover:text-red-400"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            ))}
+
+                                            {isAddingUpi ? (
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={newUpi}
+                                                        onChange={(e) => setNewUpi(e.target.value.toLowerCase().trim())}
+                                                        placeholder="e.g. 9876543210@paytm"
+                                                        className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-medium text-white focus:border-navy-400 focus:outline-none focus:ring-2 focus:ring-navy-500/30"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={saveUpi}
+                                                        disabled={!newUpi}
+                                                        className="btn-navy shrink-0 rounded-xl px-4 text-xs font-bold disabled:opacity-60"
+                                                    >
+                                                        Save
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsAddingUpi(true)}
+                                                    className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-white/20 py-2.5 text-xs font-bold text-navy-300 hover:bg-white/5"
+                                                >
+                                                    <Plus className="h-4 w-4" /> Add another UPI ID
+                                                </button>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {savedBanks.map((bank) => (
+                                                <div
+                                                    key={bank.id}
+                                                    className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm transition-colors ${selectedBankId === bank.id && !isAddingBank ? 'border-purple-400/60 bg-purple-500/15' : 'border-white/10 bg-white/5'}`}
+                                                >
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { setSelectedBankId(bank.id); setIsAddingBank(false) }}
+                                                        className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                                                    >
+                                                        <span className={`mt-0.5 h-3.5 w-3.5 shrink-0 rounded-full border-2 ${selectedBankId === bank.id && !isAddingBank ? 'border-purple-300 bg-purple-400' : 'border-white/30'}`} />
+                                                        <span className="min-w-0">
+                                                            <span className="block truncate font-semibold text-white">{bank.account_holder}</span>
+                                                            <span className="block truncate text-xs text-[var(--text-muted)]">A/C {bank.account_number} · {bank.ifsc_code}{bank.bank_name ? ` · ${bank.bank_name}` : ''}</span>
+                                                        </span>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeBank(bank.id)}
+                                                        aria-label="Remove bank account"
+                                                        className="shrink-0 text-[var(--text-dim)] hover:text-red-400"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            ))}
+
+                                            {isAddingBank ? (
+                                                <div className="space-y-2 rounded-xl border border-white/10 bg-white/5 p-3">
+                                                    <input
+                                                        type="text"
+                                                        value={bankHolder}
+                                                        onChange={(e) => setBankHolder(e.target.value)}
+                                                        placeholder="Account holder name"
+                                                        className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-medium text-white focus:border-navy-400 focus:outline-none focus:ring-2 focus:ring-navy-500/30"
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        inputMode="numeric"
+                                                        value={bankAccount}
+                                                        onChange={(e) => setBankAccount(e.target.value.replace(/\D/g, ''))}
+                                                        placeholder="Account number"
+                                                        className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-medium text-white focus:border-navy-400 focus:outline-none focus:ring-2 focus:ring-navy-500/30"
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        value={bankIfsc}
+                                                        onChange={(e) => setBankIfsc(e.target.value.toUpperCase().trim())}
+                                                        placeholder="IFSC code (e.g. HDFC0001234)"
+                                                        className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-medium uppercase text-white focus:border-navy-400 focus:outline-none focus:ring-2 focus:ring-navy-500/30"
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        value={bankName}
+                                                        onChange={(e) => setBankName(e.target.value)}
+                                                        placeholder="Bank name (optional)"
+                                                        className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-medium text-white focus:border-navy-400 focus:outline-none focus:ring-2 focus:ring-navy-500/30"
+                                                    />
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={saveBank}
+                                                            className="btn-navy flex-1 rounded-lg py-2 text-xs font-bold"
+                                                        >
+                                                            Save Account
+                                                        </button>
+                                                        {savedBanks.length > 0 && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => { setIsAddingBank(false); resetBankForm(); setError('') }}
+                                                                className="rounded-lg border border-white/10 px-4 py-2 text-xs font-bold text-[var(--text-muted)] hover:bg-white/5"
+                                                            >
+                                                                Cancel
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsAddingBank(true)}
+                                                    className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-white/20 py-2.5 text-xs font-bold text-navy-300 hover:bg-white/5"
+                                                >
+                                                    <Plus className="h-4 w-4" /> Add bank account
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
 
                                 <p className="mt-3 text-xs leading-relaxed text-[var(--text-dim)]">
