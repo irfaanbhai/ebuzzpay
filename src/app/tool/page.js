@@ -24,11 +24,31 @@ export default function ToolPage() {
     )
 
     const [showAddModal, setShowAddModal] = useState(false)
+    const [toolType, setToolType] = useState('upi') // 'upi' | 'bank'
     const [newUpiId, setNewUpiId] = useState('')
     const [upiName, setUpiName] = useState('')
     const [upiError, setUpiError] = useState('')
+    // Bank tool fields
+    const [bankHolder, setBankHolder] = useState('')
+    const [bankAccount, setBankAccount] = useState('')
+    const [bankIfsc, setBankIfsc] = useState('')
+    const [bankName, setBankName] = useState('')
     const [warning, setWarning] = useState('')
     const [showLimitModal, setShowLimitModal] = useState(false)
+
+    const ACCOUNT_PATTERN = /^[0-9]{6,20}$/
+    const IFSC_PATTERN = /^[A-Z]{4}0[A-Z0-9]{6}$/
+
+    const resetAddForm = () => {
+        setToolType('upi')
+        setNewUpiId('')
+        setUpiName('')
+        setUpiError('')
+        setBankHolder('')
+        setBankAccount('')
+        setBankIfsc('')
+        setBankName('')
+    }
 
     const handleAddClick = async () => {
         // limit check
@@ -47,10 +67,8 @@ export default function ToolPage() {
                 return
             }
 
+            resetAddForm()
             setShowAddModal(true)
-            setNewUpiId('')
-            setUpiName('')
-            setUpiError('')
         } catch (e) {
             console.error(e)
         }
@@ -100,13 +118,17 @@ export default function ToolPage() {
 
     const handleAddSubmit = async (e) => {
         e.preventDefault()
+        if (!user) return
+
+        if (toolType === 'bank') {
+            await handleAddBank()
+            return
+        }
 
         if (!upiName.trim()) {
             setUpiError('Please verify UPI first to get account name')
             return
         }
-
-        if (!user) return
 
         try {
             // Check for duplicate UPI globally using RPC
@@ -135,6 +157,58 @@ export default function ToolPage() {
         } catch (e) {
             console.error(e)
             setUpiError(e.message || "Failed to add tool")
+        }
+    }
+
+    const handleAddBank = async () => {
+        const holder = bankHolder.trim()
+        const account = bankAccount.trim()
+        const ifsc = bankIfsc.trim().toUpperCase()
+        const name = bankName.trim()
+
+        if (!holder) {
+            setUpiError('Please enter the account holder name')
+            return
+        }
+        if (!ACCOUNT_PATTERN.test(account)) {
+            setUpiError('Account number must be 6–20 digits')
+            return
+        }
+        if (!IFSC_PATTERN.test(ifsc)) {
+            setUpiError('Invalid IFSC code. Example: HDFC0001234')
+            return
+        }
+
+        try {
+            // Check for duplicate bank account globally
+            const { data: exists, error: checkError } = await supabase.rpc('check_bank_exists', {
+                account_number_input: account,
+                ifsc_input: ifsc,
+            })
+
+            if (checkError) throw checkError
+
+            if (exists) {
+                setUpiError('This bank account is already registered in the system')
+                return
+            }
+
+            const { error } = await supabase.from('user_tools').insert({
+                user_id: userId,
+                name: holder, // account holder name
+                account_number: account,
+                ifsc_code: ifsc,
+                bank_name: name || null,
+                status: 'pending_verification',
+                platform: 'bank',
+            })
+
+            if (error) throw error
+            setShowAddModal(false)
+            fetchTools() // Refresh list
+        } catch (e) {
+            console.error(e)
+            setUpiError(e.message || 'Failed to add tool')
         }
     }
 
@@ -241,17 +315,24 @@ export default function ToolPage() {
 
             {/* List */}
             <div className="space-y-4 p-4">
-                {tools.map((tool, index) => (
+                {tools.map((tool, index) => {
+                  const isBank = tool.platform === 'bank' || !tool.upi_id
+                  const title = isBank ? (tool.bank_name || tool.name || 'Bank Account') : tool.upi_id
+                  const subtitle = isBank
+                    ? `A/C ${tool.account_number || ''}${tool.ifsc_code ? ` · ${tool.ifsc_code}` : ''}`
+                    : (tool.phone_number || tool.upi_id.split('@')[0])
+                  const logoChar = (title || '?')[0]
+                  return (
                     <div key={tool.id} className={`relative overflow-hidden rounded-3xl border border-white/10 p-5 text-white shadow-lg ${getGradient(index)}`}>
                         <div className="flex items-start justify-between">
                             <div className="flex gap-4">
                                 {/* Logo Placeholder */}
                                 <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-white/20 bg-white/10 backdrop-blur-sm">
-                                    <span className="text-lg font-bold uppercase">{tool.upi_id[0]}</span>
+                                    <span className="text-lg font-bold uppercase">{logoChar}</span>
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-bold">{tool.upi_id}</h3>
-                                    <p className="text-sm text-white/60">{tool.phone_number || tool.upi_id.split('@')[0]}</p>
+                                    <h3 className="text-lg font-bold">{title}</h3>
+                                    <p className="text-sm text-white/60">{subtitle}</p>
                                 </div>
                             </div>
 
@@ -300,7 +381,8 @@ export default function ToolPage() {
                             {tool.platform}
                         </div>
                     </div>
-                ))}
+                  )
+                })}
 
                 {loading && (
                     <div className="mt-20 text-center text-[var(--text-dim)]">Loading...</div>
@@ -327,33 +409,106 @@ export default function ToolPage() {
                 <div className="anim-fade fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
                     <div className="anim-pop glass-strong w-full max-w-sm rounded-3xl p-6 shadow-2xl">
                         <h2 className="mb-4 text-xl font-bold text-white">Add New Tool</h2>
-                        <form onSubmit={handleAddSubmit}>
-                            <div className="mb-4">
-                                <label className="mb-1 block text-sm font-medium text-[var(--text-muted)]">UPI ID</label>
-                                <input
-                                    type="text"
-                                    placeholder="e.g. 9876543210@paytm"
-                                    value={newUpiId}
-                                    onChange={handleUpiChange}
-                                    className={`w-full rounded-xl border bg-white/5 px-4 py-3 font-medium text-white focus:outline-none focus:ring-2 focus:ring-navy-500/30 ${upiError && newUpiId ? 'border-red-500' : 'border-white/10 focus:border-navy-400'}`}
-                                    autoFocus
-                                />
-                                {upiError && newUpiId && (
-                                    <p className="mt-1 text-xs text-red-400">{upiError}</p>
-                                )}
-                            </div>
 
-                            <div className="mb-6">
-                                <label className="mb-1 block text-sm font-medium text-[var(--text-muted)]">Account Name</label>
-                                <input
-                                    type="text"
-                                    placeholder="Enter verified name on UPI"
-                                    value={upiName}
-                                    onChange={(e) => setUpiName(e.target.value)}
-                                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-medium text-white focus:border-navy-400 focus:outline-none focus:ring-2 focus:ring-navy-500/30"
-                                />
-                                <p className="mt-1 text-xs text-[var(--text-dim)]">This name will be verified by admin.</p>
-                            </div>
+                        {/* Tool type: UPI ID or Bank account */}
+                        <div className="mb-4 grid grid-cols-2 gap-2 rounded-xl border border-white/10 bg-white/5 p-1">
+                            <button
+                                type="button"
+                                onClick={() => { setToolType('upi'); setUpiError('') }}
+                                className={`rounded-lg py-2 text-xs font-bold transition-colors ${toolType === 'upi' ? 'bg-navy-500/30 text-navy-100' : 'text-[var(--text-muted)] hover:text-white'}`}
+                            >
+                                UPI ID
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => { setToolType('bank'); setUpiError('') }}
+                                className={`rounded-lg py-2 text-xs font-bold transition-colors ${toolType === 'bank' ? 'bg-navy-500/30 text-navy-100' : 'text-[var(--text-muted)] hover:text-white'}`}
+                            >
+                                Bank Account
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleAddSubmit}>
+                            {toolType === 'upi' ? (
+                                <>
+                                    <div className="mb-4">
+                                        <label className="mb-1 block text-sm font-medium text-[var(--text-muted)]">UPI ID</label>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. 9876543210@paytm"
+                                            value={newUpiId}
+                                            onChange={handleUpiChange}
+                                            className={`w-full rounded-xl border bg-white/5 px-4 py-3 font-medium text-white focus:outline-none focus:ring-2 focus:ring-navy-500/30 ${upiError && newUpiId ? 'border-red-500' : 'border-white/10 focus:border-navy-400'}`}
+                                            autoFocus
+                                        />
+                                        {upiError && newUpiId && (
+                                            <p className="mt-1 text-xs text-red-400">{upiError}</p>
+                                        )}
+                                    </div>
+
+                                    <div className="mb-6">
+                                        <label className="mb-1 block text-sm font-medium text-[var(--text-muted)]">Account Name</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Enter verified name on UPI"
+                                            value={upiName}
+                                            onChange={(e) => setUpiName(e.target.value)}
+                                            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-medium text-white focus:border-navy-400 focus:outline-none focus:ring-2 focus:ring-navy-500/30"
+                                        />
+                                        <p className="mt-1 text-xs text-[var(--text-dim)]">This name will be verified by admin.</p>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="mb-3">
+                                        <label className="mb-1 block text-sm font-medium text-[var(--text-muted)]">Account Holder Name</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Name as on bank account"
+                                            value={bankHolder}
+                                            onChange={(e) => setBankHolder(e.target.value)}
+                                            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-medium text-white focus:border-navy-400 focus:outline-none focus:ring-2 focus:ring-navy-500/30"
+                                            autoFocus
+                                        />
+                                    </div>
+                                    <div className="mb-3">
+                                        <label className="mb-1 block text-sm font-medium text-[var(--text-muted)]">Account Number</label>
+                                        <input
+                                            type="text"
+                                            inputMode="numeric"
+                                            placeholder="Bank account number"
+                                            value={bankAccount}
+                                            onChange={(e) => setBankAccount(e.target.value.replace(/\D/g, ''))}
+                                            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-medium text-white focus:border-navy-400 focus:outline-none focus:ring-2 focus:ring-navy-500/30"
+                                        />
+                                    </div>
+                                    <div className="mb-3">
+                                        <label className="mb-1 block text-sm font-medium text-[var(--text-muted)]">IFSC Code</label>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. HDFC0001234"
+                                            value={bankIfsc}
+                                            onChange={(e) => setBankIfsc(e.target.value.toUpperCase().trim())}
+                                            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-medium uppercase text-white focus:border-navy-400 focus:outline-none focus:ring-2 focus:ring-navy-500/30"
+                                        />
+                                    </div>
+                                    <div className="mb-6">
+                                        <label className="mb-1 block text-sm font-medium text-[var(--text-muted)]">Bank Name <span className="text-[var(--text-dim)]">(optional)</span></label>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. HDFC Bank"
+                                            value={bankName}
+                                            onChange={(e) => setBankName(e.target.value)}
+                                            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-medium text-white focus:border-navy-400 focus:outline-none focus:ring-2 focus:ring-navy-500/30"
+                                        />
+                                        <p className="mt-1 text-xs text-[var(--text-dim)]">These details will be verified by admin.</p>
+                                    </div>
+                                </>
+                            )}
+
+                            {upiError && (toolType === 'bank' || !newUpiId) && (
+                                <p className="mb-3 text-xs text-red-400">{upiError}</p>
+                            )}
 
                             <div className="flex gap-3">
                                 <button
@@ -365,7 +520,11 @@ export default function ToolPage() {
                                 </button>
                                 <button
                                     type="submit"
-                                    disabled={!!upiError || !newUpiId || !upiName.trim()}
+                                    disabled={
+                                        toolType === 'upi'
+                                            ? (!!upiError || !newUpiId || !upiName.trim())
+                                            : (!bankHolder.trim() || !bankAccount.trim() || !bankIfsc.trim())
+                                    }
                                     className="btn-navy flex-1 rounded-xl py-3 font-bold disabled:cursor-not-allowed"
                                 >
                                     Add Tool

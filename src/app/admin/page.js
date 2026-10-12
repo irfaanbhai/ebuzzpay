@@ -769,14 +769,14 @@ export default function AdminPage() {
                   {/* Tools Section */}
                   {user.tools && user.tools.length > 0 && (
                     <div className="rounded-lg border border-white/5 bg-white/5 p-3">
-                      <p className="mb-2 text-[10px] font-bold uppercase text-[var(--text-dim)]">Attached UPI IDs</p>
+                      <p className="mb-2 text-[10px] font-bold uppercase text-[var(--text-dim)]">Attached Accounts</p>
                       <div className="flex flex-wrap gap-2">
                         {user.tools.map((tool, idx) => (
                           <span key={idx} className={`flex items-center gap-1 rounded border px-2 py-1 text-xs ${tool.status === 'running' ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-300' :
                             'border-white/10 bg-white/5 text-[var(--text-muted)]'
                             }`}>
                             <span className={`h-1.5 w-1.5 rounded-full ${tool.status === 'running' ? 'bg-emerald-400' : 'bg-[var(--text-dim)]'}`}></span>
-                            {tool.upi_id}
+                            {tool.upi_id || (tool.platform === 'bank' ? 'Bank Account' : '—')}
                           </span>
                         ))}
                       </div>
@@ -827,7 +827,7 @@ export default function AdminPage() {
                 <div key={tool.id} className="glass rounded-xl p-4">
                   <div className="mb-2 flex items-center justify-between">
                     <div>
-                      <h3 className="font-bold text-white">{tool.upi_id}</h3>
+                      <h3 className="font-bold text-white">{tool.upi_id || tool.bank_name || 'Bank Account'}</h3>
                       <p className="text-xs font-medium text-[var(--text-muted)]">{tool.name || 'Unnamed'}</p>
                     </div>
                     <span className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${tool.status === 'running' ? 'bg-emerald-500/15 text-emerald-300' :
@@ -838,6 +838,13 @@ export default function AdminPage() {
                       {tool.status === 'pending_verification' ? 'PENDING' : tool.status}
                     </span>
                   </div>
+                  {tool.platform === 'bank' && tool.account_number && (
+                    <div className="mb-2 rounded-lg border border-navy-400/30 bg-navy-500/10 p-2 text-xs text-white/90">
+                      <p>A/C: {tool.account_number}</p>
+                      <p>IFSC: {tool.ifsc_code}</p>
+                      {tool.bank_name && <p>Bank: {tool.bank_name}</p>}
+                    </div>
+                  )}
                   <p className="mb-2 text-xs text-[var(--text-dim)]">User: {tool.user_id}</p>
 
                   {tool.status === 'pending_verification' && (
@@ -903,7 +910,7 @@ export default function AdminPage() {
                     className="glass w-full rounded-xl p-4 text-left transition-colors hover:bg-white/[0.07]"
                   >
                     <div className="mb-1 flex items-center justify-between">
-                      <h3 className="font-bold text-white">{tool.upi_id}</h3>
+                      <h3 className="font-bold text-white">{tool.upi_id || tool.bank_name || 'Bank Account'}</h3>
                       <div className="flex items-center gap-2">
                         {isRecent && tool.status === 'running' && <span className="animate-pulse rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-300">LIVE (10m)</span>}
                         <span className={`h-2 w-2 rounded-full ${tool.status === 'running' ? 'bg-emerald-400' : 'bg-[var(--text-dim)]'}`}></span>
@@ -1241,7 +1248,7 @@ export default function AdminPage() {
           <div className="anim-pop glass-strong flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-2xl">
             <div className="flex items-center justify-between border-b border-white/10 bg-white/5 p-4">
               <div>
-                <h2 className="font-bold text-white">{selectedTool.upi_id}</h2>
+                <h2 className="font-bold text-white">{selectedTool.upi_id || selectedTool.bank_name || 'Bank Account'}</h2>
                 <p className="text-xs text-[var(--text-muted)]">User: {selectedTool.user_id}</p>
               </div>
               <button onClick={() => setIsModalOpen(false)} className="rounded-full bg-white/10 p-2 hover:bg-white/20">
