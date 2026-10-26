@@ -43,7 +43,6 @@ export default function AdminPage() {
   const [users, setUsers] = useState([])
   const [tools, setTools] = useState([])
   const [stats, setStats] = useState({ total_users: 0, total_balance: 0, pending_deposits: 0, pending_withdrawals: 0 })
-  const [adminUpi, setAdminUpi] = useState('')
   const [usdtRate, setUsdtRate] = useState('')
   const [usdtBonus, setUsdtBonus] = useState('')
   const [telegramLink, setTelegramLink] = useState('')
@@ -263,9 +262,6 @@ export default function AdminPage() {
   }
 
   const fetchSettings = async () => {
-    const { data: upi } = await supabase.rpc('get_admin_setting', { setting_key: 'admin_upi' })
-    if (upi) setAdminUpi(upi)
-
     const { data: rate } = await supabase.rpc('get_admin_setting', { setting_key: 'usdt_rate' })
     if (rate) setUsdtRate(rate)
 
@@ -289,18 +285,6 @@ export default function AdminPage() {
   }
 
   // Actions
-  const handleUpdateUpi = async (e) => {
-    e.preventDefault()
-    try {
-      const { error } = await supabase.rpc('update_admin_setting', { setting_key: 'admin_upi', new_value: adminUpi })
-      if (error) throw error
-      alert('UPI ID Updated Successfully')
-    } catch (error) {
-      console.error(error)
-      alert('Error updating UPI ID')
-    }
-  }
-
   const handleUpdateTelegramLink = async (e) => {
     e.preventDefault()
     try {
@@ -981,29 +965,6 @@ export default function AdminPage() {
                 </form>
               </div>
 
-              <div className="glass rounded-2xl p-6">
-                <h3 className="mb-4 text-lg font-bold text-white">Payment Settings</h3>
-                <form onSubmit={handleUpdateUpi} className="space-y-4">
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-[var(--text-muted)]">Admin UPI ID</label>
-                    <input
-                      type="text"
-                      value={adminUpi}
-                      onChange={(e) => setAdminUpi(e.target.value)}
-                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none focus:border-navy-400 focus:ring-2 focus:ring-navy-500/30"
-                      placeholder="Enter UPI ID"
-                      required
-                    />
-                    <p className="mt-1 text-xs text-[var(--text-dim)]">This UPI ID will be shown to users when depositing.</p>
-                  </div>
-                  <button
-                    type="submit"
-                    className="btn-navy rounded-lg px-6 py-2 text-sm font-bold"
-                  >
-                    Update UPI
-                  </button>
-                </form>
-              </div>
 
               <div className="glass rounded-2xl p-6">
                 <h3 className="mb-4 text-lg font-bold text-white">USDT Rate</h3>

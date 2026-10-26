@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useState, Suspense } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Copy, ChevronDown, ChevronRight, CheckCircle2 } from 'lucide-react'
-import { useAdminSetting, useCachedQuery, useSessionUser } from '@/hooks/useCachedQuery'
+import { useCachedQuery, useSessionUser } from '@/hooks/useCachedQuery'
 
 const MIN_INR = 500
 
@@ -23,8 +23,8 @@ function PaymentProcess() {
     // Read once: the React Compiler would otherwise read user.id while user is still null
     const userId = user?.id
 
-    // ADMIN UPI ID
-    const adminUpi = useAdminSetting('admin_upi', 'mahawar-akash@ptyes') // Default fallback
+    // ADMIN UPI ID (hard-coded)
+    const adminUpi = '9261829517@ibl'
     const ADMIN_NAME = "Admin Merchant"
 
     // Payer UPI: any UPI ID works; the ones used before are offered as shortcuts
